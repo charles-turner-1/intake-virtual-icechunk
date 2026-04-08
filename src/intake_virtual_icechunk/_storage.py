@@ -15,7 +15,8 @@ def _resolve_storage(store: str, storage_options: dict):
     store : str
         The store URI.  Supported schemes:
 
-        * Local path or ``file://...`` → local filesystem storage.
+        * Local path (including Windows paths such as ``C:/path/...``)
+          or ``file://...`` → local filesystem storage.
         * ``s3://bucket/prefix`` → AWS S3 (or compatible) storage.
         * ``gs://bucket/prefix`` or ``gcs://bucket/prefix`` → Google Cloud Storage.
         * ``az://container/prefix`` → Azure Blob Storage.  The ``account``
@@ -35,7 +36,9 @@ def _resolve_storage(store: str, storage_options: dict):
     parsed = urlparse(store)
     scheme = parsed.scheme
 
-    if scheme in ("", "file"):
+    # On Windows, urlparse("C:/path/...") sets scheme="c" (the drive letter).
+    # Treat single-character schemes as local paths.
+    if scheme in ("", "file") or (len(scheme) == 1 and scheme.isalpha()):
         path = parsed.path if scheme == "file" else store
         return icechunk.local_filesystem_storage(path)
 
