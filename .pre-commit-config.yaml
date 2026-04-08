@@ -10,3 +10,4 @@ repos:
     hooks:
     - id: mypy
       name: mypy
+      args: ['--ignore-missing-imports']

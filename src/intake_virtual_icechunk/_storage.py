@@ -1,12 +1,12 @@
 # Copyright 2026 ACCESS-NRI and contributors. See the top-level COPYRIGHT file for details.
 # SPDX-License-Identifier: Apache-2.0
 
-from __future__ import annotations
-
 from urllib.parse import urlparse
 
+import icechunk
 
-def _resolve_storage(store: str, storage_options: dict):
+
+def _resolve_storage(store: str, storage_options: dict) -> icechunk.Storage:
     """
     Resolve a store path/URL to an ``icechunk.Storage`` object.
 
@@ -31,7 +31,6 @@ def _resolve_storage(store: str, storage_options: dict):
     -------
     icechunk.Storage
     """
-    import icechunk
 
     parsed = urlparse(store)
     scheme = parsed.scheme
@@ -59,8 +58,7 @@ def _resolve_storage(store: str, storage_options: dict):
             container=container, prefix=prefix, **storage_options
         )
 
-    else:
-        raise ValueError(
-            f"Unsupported store scheme: {scheme!r}. "
-            "Expected a local path or one of s3://, gs://, gcs://, az://."
-        )
+    raise ValueError(
+        f"Unsupported store scheme: {scheme!r}. "
+        "Expected a local path or one of s3://, gs://, gcs://, az://."
+    )
