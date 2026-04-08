@@ -1,7 +1,14 @@
 # Copyright 2026 ACCESS-NRI and contributors. See the top-level COPYRIGHT file for details.
 # SPDX-License-Identifier: Apache-2.0
+import os
 
-from __future__ import annotations
+import icechunk
+import intake
+import xarray as xr
+import zarr
+
+from ._storage import _resolve_storage
+from .cat import VirtualIcechunkCatalogModel
 
 
 class IcechunkStoreBuilder:
@@ -37,12 +44,16 @@ class IcechunkStoreBuilder:
         Keyword arguments forwarded to the Icechunk storage backend.
     """
 
-    def __init__(self, catalog_path, store_path, storage_options=None):
+    import virtualizarr  # noqa: F401 – ensure VirtualiZarr is importable
+
+    def __init__(
+        self, catalog_path: str, store_path: str, storage_options: dict | None = None
+    ):
         self.catalog_path = catalog_path
         self.store_path = store_path
         self.storage_options = storage_options or {}
 
-    def build(self):
+    def build(self) -> None:
         """Build the Icechunk store.
 
         For each dataset group in the intake-esm catalog:
@@ -61,16 +72,6 @@ class IcechunkStoreBuilder:
         ``groupby_attrs``, so the Icechunk store structure mirrors the
         intake-esm grouping.
         """
-        import os
-
-        import icechunk
-        import intake
-        import virtualizarr  # noqa: F401 – ensure VirtualiZarr is importable
-        import xarray as xr
-        import zarr
-
-        from ._storage import _resolve_storage
-        from .cat import VirtualIcechunkCatalogModel
 
         # ------------------------------------------------------------------
         # 1. Load the intake-esm catalog
