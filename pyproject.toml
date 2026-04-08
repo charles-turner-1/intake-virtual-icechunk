@@ -138,11 +138,11 @@ exclude = [
 ]
 # E402: module level import not at top of file
 # E501: line too long - let black worry about that
-ignore = [
+lint.ignore = [
     "E402",
     "E501",
 ]
-select = [
+lint.select = [
     # Pyflakes
     "F",
     # Pycodestyle
@@ -154,8 +154,8 @@ select = [
     "UP",
 ]
 
-[tool.ruff.mccabe]
+[tool.ruff.lint.mccabe]
 max-complexity = 18
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["intake_virtual_icechunk"]
