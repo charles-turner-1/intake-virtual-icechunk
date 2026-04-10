@@ -223,6 +223,16 @@ class IcechunkStoreBuilder:
         storage = _resolve_storage(self.store_path, self.storage_options)
         repo = icechunk.Repository.create(storage)
 
+        # JAnky - needed for virtualisation, needs to be generalised.
+        # also doesnjt work...
+        config = icechunk.RepositoryConfig.default()
+        config.set_virtual_chunk_container(
+            icechunk.VirtualChunkContainer(
+                url_prefix = "file:///",
+                store = icechunk.local_filesystem_store("/"),
+            )
+        )
+
         # ------------------------------------------------------------------
         # 3. Build each group inside a single transaction
         # ------------------------------------------------------------------
@@ -248,8 +258,17 @@ class IcechunkStoreBuilder:
                     urls=file_paths,
                     parser=self.parser,
                     registry=self.obsstore_registry,
+                    parallel='dask',
+                    decode_times=False, 
+                    combine="nested",
+                    concat_dim="time",
+                    compat="override",
+                    coords=["time"],
                 )
                 vds.vz.to_icechunk(store, group=public_key)
+
+                # And print a little we're done
+                print(f'Virtualised group {public_key} successfully!')
 
                 # Write group metadata into .zattrs so the catalog can search
                 # these groups without opening the arrays.
