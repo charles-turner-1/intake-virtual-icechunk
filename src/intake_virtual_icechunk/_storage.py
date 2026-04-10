@@ -2,11 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from urllib.parse import urlparse
-import os
 
 import icechunk
 from obspec_utils.registry import ObjectStoreRegistry
-from obstore.store import LocalStore
+from obstore.store import LocalStore, S3Store
 
 
 class IceChunkStoreError(Exception):
@@ -91,8 +90,8 @@ def _resolve_store(paths: str | list[str], store_options: dict) -> ObjectStoreRe
     scheme = parsed.scheme
 
     if scheme in ("", "file") or (len(scheme) == 1 and scheme.isalpha()):
-        store = LocalStore()
-        return ObjectStoreRegistry({f"file://{path}" : store for path in paths})
+        store = LocalStore.from_url("file:///")
+        return ObjectStoreRegistry({"file:///": store})
 
     bucket = parsed.netloc
 
@@ -103,6 +102,7 @@ def _resolve_store(paths: str | list[str], store_options: dict) -> ObjectStoreRe
             access_key_id=store_options.get("access_key_id", None),
             secret_access_key=store_options.get("secret_access_key", None),
         )
+        return ObjectStoreRegistry({f"{bucket}": store})
     elif scheme in ("gs", "gcs"):
         raise NotImplementedError(
             "GCS support is disabled until I figure out the correct initialisation params"

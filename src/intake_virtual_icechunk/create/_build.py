@@ -92,7 +92,6 @@ class IcechunkStoreBuilder:
 
     """
 
-
     def __init__(
         self,
         catalog_path: str,
@@ -179,8 +178,8 @@ class IcechunkStoreBuilder:
         """
 
         path_column = self.esm_ds.esmcat.assets.column_name
-        sample_path = self.esm_ds.esmcat.df[path_column].iloc[0]
-        self.obsstore_registry = _resolve_store(sample_path, self.store_options)
+        paths = self.esm_ds.esmcat.df[path_column].tolist()
+        self.obsstore_registry = _resolve_store(paths, self.store_options)
 
         return self.obsstore_registry
 
