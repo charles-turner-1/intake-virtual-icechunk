@@ -263,26 +263,30 @@ class IcechunkStoreBuilder:
                 # Collect asset file paths for this group
                 file_paths: list[str] = group_df[assets_col].tolist()
 
-                vds = open_virtual_mfdataset(
-                    urls=file_paths,
-                    parser=self.parser,
-                    registry=self.obsstore_registry,
-                    parallel='dask',
-                    decode_times=False, 
-                    combine="nested",
-                    concat_dim="time",
-                    compat="override",
-                    coords=["time"],
-                )
-                vds.vz.to_icechunk(store, group=public_key)
+                failed_list = []
+                try:
+                    with open_virtual_mfdataset(
+                        urls=file_paths,
+                        parser=self.parser,
+                        registry=self.obsstore_registry,
+                        parallel='dask',
+                        decode_times=False, 
+                        combine="nested",
+                        concat_dim="time",
+                        compat="override",
+                        coords=["time"],
+                    ) as vds:
+                        vds.vz.to_icechunk(store, group=public_key)
 
-                # And print a little we're done
-                print(f'Virtualised group {public_key} successfully!')
+                    # And print a little we're done
+                    print(f'Virtualised group {public_key} successfully!')
 
-                # Write group metadata into .zattrs so the catalog can search
-                # these groups without opening the arrays.
-                zarr_group = zarr.open_group(store, path=public_key, mode="a")
-                zarr_group.attrs.update(group_attrs)
+                    # Write group metadata into .zattrs so the catalog can search
+                    # these groups without opening the arrays.
+                    zarr_group = zarr.open_group(store, path=public_key, mode="a")
+                    zarr_group.attrs.update(group_attrs)
+                except Exception as e:
+                    failed_list.append((public_key, e))
 
         # Write the JSON sidecar
         store_path_obj = os.path.abspath(self.store_path)
