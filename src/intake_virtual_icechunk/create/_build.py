@@ -242,7 +242,6 @@ class IcechunkStoreBuilder:
 
         # Persist the configuration so we don't need to figure it out when we come
         # back to open the store
-
         repo.save_config()
 
         # ------------------------------------------------------------------
