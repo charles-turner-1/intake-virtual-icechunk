@@ -83,8 +83,9 @@ class IcechunkCatalog(Catalog):
     ):
         super().__init__(**intake_kwargs)
         # Path may be passed as a string or a Path, we'll store it internally as
-        # a Path and convert to a string where needed. TBC if this is a good idea.
-        self.store: Path = Path(store)
+        # a str, and convert back to a Path if and when where needed.
+        # TBC if this is a good idea.
+        self.store: str = str(store)
         self.storage_options = storage_options or {}
         self.xarray_kwargs = xarray_kwargs or {}
         self.virtual_chunk_url_prefixes = virtual_chunk_url_prefixes or []
@@ -109,7 +110,7 @@ class IcechunkCatalog(Catalog):
 
             from ._storage import _resolve_storage
 
-            storage = _resolve_storage(str(self.store), self.storage_options)
+            storage = _resolve_storage(self.store, self.storage_options)
             kwargs = {}
             if self.virtual_chunk_url_prefixes:
                 kwargs["authorize_virtual_chunk_access"] = (
