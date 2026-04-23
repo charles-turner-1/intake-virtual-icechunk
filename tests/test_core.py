@@ -16,8 +16,9 @@ class TestVirtualIcechunkCatalogModel:
     This class has been human audited.
     """
 
-    def test_save_creates_json(self, tmp_path, icechunk_store_path):
+    def test_save_creates_json(self, tmp_path, icechunk_store_path, sample_data):
         fname = _intake_cat_filename(icechunk_store_path)
+        url_prefix = f"file://{sample_data}/access-om2/"
 
         model = VirtualIcechunkCatalogModel.load(str(icechunk_store_path / fname))
 
@@ -25,6 +26,11 @@ class TestVirtualIcechunkCatalogModel:
         model.description = "My catalog"
         model.storage_options = {"key": "value"}
         model.title = "Test"
+
+        # Make sure to update url_prefix in the virtual chunk model to match the
+        # test data, otherwise we will fail moving test data between machines
+
+        model.virtual_chunk_model.url_prefix = url_prefix
 
         # Turn the path into a string for easier comparison in the JSON output
         icechunk_store_path = str(icechunk_store_path)
@@ -43,11 +49,12 @@ class TestVirtualIcechunkCatalogModel:
         assert data["storage_options"] == {"key": "value"}
         assert data["last_updated"] is not None
 
-    def test_default_version(self, icechunk_store_path):
+    def test_default_version(self, sample_data, icechunk_store_path):
         # Extracted from the icechunk store used in testing. We can abstract this
         # away eventualy I think
+        url_prefix = f"file://{sample_data}/access-om2/"
         vc_model_dict = {
-            "url_prefix": "file:///Users/u1166368/catalog/intake-virtual-icechunk/tests/data/access-om2/",
+            "url_prefix": url_prefix,
             "store_type": "PyObjectStoreConfig_LocalFileSystem",
             "open_kwargs": {},
         }
