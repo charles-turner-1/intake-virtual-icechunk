@@ -161,7 +161,7 @@ def _resolve_store(
     )
 
 
-def _intake_cat_filename(store_path: str) -> str:
+def _intake_cat_filename(store_path: Path | str) -> str:
     """
     Generate a JSON sidecar filename for an Icechunk store.
 

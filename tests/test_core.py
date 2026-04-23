@@ -7,6 +7,8 @@ import pytest
 
 from intake_virtual_icechunk.cat import VirtualIcechunkCatalogModel
 from intake_virtual_icechunk.core import IcechunkCatalog
+from intake_virtual_icechunk.source._containers import VirtualChunkContainerModel
+from intake_virtual_icechunk.utils import _intake_cat_filename
 
 # ---------------------------------------------------------------------------
 # VirtualIcechunkCatalogModel — save / load round-trip
@@ -15,12 +17,18 @@ from intake_virtual_icechunk.core import IcechunkCatalog
 
 class TestVirtualIcechunkCatalogModel:
     def test_save_creates_json(self, tmp_path, icechunk_store_path):
-        model = VirtualIcechunkCatalogModel(
-            store=icechunk_store_path,
-            description="My catalog",
-            title="Test",
-            storage_options={"key": "value"},
-        )
+        fname = _intake_cat_filename(icechunk_store_path)
+
+        model = VirtualIcechunkCatalogModel.load(str(icechunk_store_path / fname))
+
+        # Set a couple of fields to non-default values to check they round-trip correctly
+        model.description = "My catalog"
+        model.storage_options = {"key": "value"}
+        model.title = "Test"
+
+        # Turn the path into a string for easier comparison in the JSON output
+        icechunk_store_path = str(icechunk_store_path)
+
         model.save("my-catalog", directory=str(tmp_path))
         json_path = tmp_path / "my-catalog.json"
         assert json_path.exists()
@@ -35,28 +43,19 @@ class TestVirtualIcechunkCatalogModel:
         assert data["storage_options"] == {"key": "value"}
         assert data["last_updated"] is not None
 
-    def test_load_round_trip(self, tmp_path, icechunk_store_path):
-        model = VirtualIcechunkCatalogModel(
-            store=icechunk_store_path,
-            description="Round-trip test",
-            storage_options={},
-        )
-        model.save("round-trip", directory=str(tmp_path))
-
-        loaded = VirtualIcechunkCatalogModel.load(str(tmp_path / "round-trip.json"))
-
-        assert loaded.store == icechunk_store_path
-        assert loaded.description == "Round-trip test"
-        assert loaded.id == "round-trip"
-
     def test_default_version(self, icechunk_store_path):
-        model = VirtualIcechunkCatalogModel(store=icechunk_store_path)
+        # Extracted from the icechunk store used in testing. We can abstract this
+        # away eventualy I think
+        vc_model_dict = {
+            "url_prefix": "file:///Users/u1166368/catalog/intake-virtual-icechunk/tests/data/access-om2/",
+            "store_type": "PyObjectStoreConfig_LocalFileSystem",
+            "open_kwargs": {},
+        }
+        virtual_chunk_container = VirtualChunkContainerModel.from_dict(vc_model_dict)
+        model = VirtualIcechunkCatalogModel(
+            store=str(icechunk_store_path), virtual_chunk_model=virtual_chunk_container
+        )
         assert model.version == "1.0.0"
-
-
-# ---------------------------------------------------------------------------
-# IcechunkCatalog — from_json
-# ---------------------------------------------------------------------------
 
 
 class TestIcechunkCatalogFromJson:
@@ -66,13 +65,13 @@ class TestIcechunkCatalogFromJson:
 
     def test_from_json_store_matches(self, catalog_json_path, icechunk_store_path):
         cat = IcechunkCatalog.from_json(catalog_json_path)
-        assert cat.store == icechunk_store_path
+        assert cat.store == str(icechunk_store_path)
 
     def test_save_round_trip(self, tmp_path, icechunk_store_path):
         cat = IcechunkCatalog(store=icechunk_store_path)
         cat.save("saved-cat", directory=str(tmp_path))
         loaded = IcechunkCatalog.from_json(str(tmp_path / "saved-cat.json"))
-        assert loaded.store == icechunk_store_path
+        assert loaded.store == str(icechunk_store_path)
 
 
 # ---------------------------------------------------------------------------
