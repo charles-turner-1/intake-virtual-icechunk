@@ -75,12 +75,32 @@ class TestIcechunkCatalogFromJson:
     CI bugs...
     """
 
-    def test_from_json_returns_catalog(self, catalog_json_path):
-        cat = IcechunkCatalog.from_json(catalog_json_path)
+    @pytest.fixture
+    def temp_json_local_path(
+        self, icechunk_store_path, catalog_json_path, sample_data, tmpdir
+    ) -> str:
+        # This is a bit hacky, but we need to copy the JSON file to a local path
+        # for the test, otherwise we will have fsspec issues trying to read it from
+        # S3 or wherever in the test. We can probably make this cleaner by using
+        # temporary files or something, but this is fine for now.
+        with open(catalog_json_path) as f:
+            data = json.load(f)
+
+        data["store"] = str(icechunk_store_path)
+        data["virtual_chunk_model"]["url_prefix"] = f"file://{sample_data}/access-om2/"
+
+        local_json_path = tmpdir / "catalog.json"
+        with open(local_json_path, "w") as f:
+            json.dump(data, f)
+
+        return str(local_json_path)
+
+    def test_from_json_returns_catalog(self, temp_json_local_path):
+        cat = IcechunkCatalog.from_json(temp_json_local_path)
         assert isinstance(cat, IcechunkCatalog)
 
-    def test_from_json_store_matches(self, catalog_json_path, icechunk_store_path):
-        cat = IcechunkCatalog.from_json(catalog_json_path)
+    def test_from_json_store_matches(self, temp_json_local_path, icechunk_store_path):
+        cat = IcechunkCatalog.from_json(temp_json_local_path)
         assert cat.store == str(icechunk_store_path)
 
     def test_save_round_trip(self, tmp_path, icechunk_store_path):
