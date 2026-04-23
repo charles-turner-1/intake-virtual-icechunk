@@ -28,8 +28,11 @@ class TestVirtualIcechunkCatalogModel:
         model.title = "Test"
 
         # Make sure to update url_prefix in the virtual chunk model to match the
-        # test data, otherwise we will fail moving test data between machines
-
+        # test data, otherwise we will fail moving test data between machines.
+        # Same goes for the store path, which is used in the catalog model's store
+        # field. We should probably create temporary copies rathe than modifying
+        # the test data, but this is easier for now.
+        model.store = str(icechunk_store_path)
         model.virtual_chunk_model.url_prefix = url_prefix
 
         # Turn the path into a string for easier comparison in the JSON output
@@ -58,6 +61,7 @@ class TestVirtualIcechunkCatalogModel:
             "store_type": "PyObjectStoreConfig_LocalFileSystem",
             "open_kwargs": {},
         }
+
         virtual_chunk_container = VirtualChunkContainerModel.from_dict(vc_model_dict)
         model = VirtualIcechunkCatalogModel(
             store=str(icechunk_store_path), virtual_chunk_model=virtual_chunk_container
