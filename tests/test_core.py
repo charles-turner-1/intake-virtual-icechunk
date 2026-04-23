@@ -79,10 +79,10 @@ class TestIcechunkCatalogFromJson:
     def temp_json_local_path(
         self, icechunk_store_path, catalog_json_path, sample_data, tmpdir
     ) -> str:
-        # This is a bit hacky, but we need to copy the JSON file to a local path
-        # for the test, otherwise we will have fsspec issues trying to read it from
-        # S3 or wherever in the test. We can probably make this cleaner by using
-        # temporary files or something, but this is fine for now.
+        """
+        Rewrites the catalog json to not use a fixture from my local machine. Will
+        need proper cleaning up later, this is a janky fix.
+        """
         with open(catalog_json_path) as f:
             data = json.load(f)
 
