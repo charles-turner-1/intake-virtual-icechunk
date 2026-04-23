@@ -67,7 +67,8 @@ class TestVirtualIcechunkCatalogModel:
 
 class TestIcechunkCatalogFromJson:
     """
-    This class has been human audited.
+    This class has been human audited. Apparently not very well because there are
+    CI bugs...
     """
 
     def test_from_json_returns_catalog(self, catalog_json_path):

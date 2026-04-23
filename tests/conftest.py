@@ -41,7 +41,7 @@ def groups():
     ]
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def icechunk_store_path(sample_data) -> Path:
     """
     Use a minimal icechunk store for testing. This is
@@ -49,7 +49,7 @@ def icechunk_store_path(sample_data) -> Path:
     return sample_data / "access-om2" / "icecat.icechunk"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def catalog_json_path(icechunk_store_path) -> Path:
     from intake_virtual_icechunk.utils import _intake_cat_filename
 
