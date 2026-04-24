@@ -7826,19 +7826,6 @@ packages:
   - pytest-cov ; extra == 'test'
   - virtualizarr ; extra == 'virtualizarr'
   requires_python: '>=3.12'
-- pypi: ./
-  name: intake-virtual-icechunk
-  version: 0.0.5.dev39+g362eaf7c4.d20260424
-  sha256: b8972517651e65a263fa5663f28dd3fdb208e7d588973bef1a1b3e3c63d30326
-  requires_dist:
-  - intake>=2.0.0
-  - icechunk
-  - intake-esm
-  - zarr
-  - pytest ; extra == 'test'
-  - pytest-cov ; extra == 'test'
-  - virtualizarr ; extra == 'virtualizarr'
-  requires_python: '>=3.12'
 - conda: https://conda.anaconda.org/conda-forge/noarch/ipykernel-7.2.0-pyh5552912_1.conda
   sha256: 5c1f3e874adaf603449f2b135d48f168c5d510088c78c229bda0431268b43b27
   md5: 4b53d436f3fbc02ce3eeaf8ae9bebe01
