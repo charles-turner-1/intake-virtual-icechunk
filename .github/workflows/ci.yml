@@ -36,7 +36,7 @@ jobs:
           environments: ${{ matrix.pixi-env }}
 
       - name: Run tests
-        run: pixi run -e ${{ matrix.pixi-env }} test-cov
+        run: pixi run -e ${{ matrix.pixi-env }} test
 
       - name: Upload code coverage
         uses: codecov/codecov-action@v6

@@ -51,7 +51,7 @@ where = ["src"]
 [tool.setuptools_scm]
 
 [tool.pytest.ini_options]
-addopts = "--cov=./src --cov-report=xml"
+addopts = "--cov=intake_virtual_icechunk --cov-report=xml"
 
 [tool.coverage.run]
 omit = [
@@ -113,7 +113,6 @@ ruff = "*"
 
 [tool.pixi.feature.test.tasks]
 test = { cmd = "pytest tests/" , description = "Run the test suite" }
-test-cov = {cmd = "coverage run -m --source=intake_virtual_icechunk pytest tests && coverage xml", description = "Run tests with coverage and generate xml report"}
 lint = { cmd = "ruff check src/" , description = "Run linting" }
 
 [tool.pixi.environments]
