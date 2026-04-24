@@ -105,13 +105,16 @@ class IcechunkStoreBuilder:
 
     def __init__(
         self,
-        catalog_path: str,
+        esm_datastore_path: str,
+        esm_datastore_kwargs: dict | None,
         store_path: str,
         parser: VirtualizarrParser | None = None,
         storage_options: dict | None = None,
         store_options: dict | None = None,
     ):
-        self.catalog_path = catalog_path
+        self.esm_datastore_path = esm_datastore_path
+        self.esm_datastore_kwargs = esm_datastore_kwargs or {}
+
         self.store_path = store_path
         self._esm_ds: esm_datastore | None = None
 
@@ -129,13 +132,18 @@ class IcechunkStoreBuilder:
         """
 
         if self._esm_ds is None:
-            self._esm_ds = intake.open_esm_datastore(self.catalog_path)
+            self._esm_ds = intake.open_esm_datastore(
+                self.esm_datastore_path, **self.esm_datastore_kwargs
+            )
         return self._esm_ds
 
     def _infer_parser(self) -> VirtualizarrParser:
         """
         We can infer the parser from the esm datastore, since it's specification
-        contains it. We use this to determinte the parser
+        contains it. We use this to determinte the parser.
+
+        Warning: Calling this function *does not* set the builder's parser attribute.
+        It also returns a type, not an instance.
         """
         from virtualizarr import parsers
 
