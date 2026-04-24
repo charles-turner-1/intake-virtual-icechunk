@@ -4,7 +4,6 @@ import icechunk
 import intake
 import pytest
 import virtualizarr
-from access_nri_intake.experiment import use_datastore
 from access_nri_intake.source.builders import AccessOm2Builder
 from intake_esm import esm_datastore
 from pandas.testing import assert_frame_equal
@@ -16,18 +15,22 @@ __all__ = ["IcechunkStoreBuilder", "pytest"]
 
 
 @pytest.fixture(scope="session")
-def local_om2_datastore_path(sample_data) -> Path:
+def local_om2_datastore_path(sample_data, tmp_path_factory) -> Path:
     data_root = sample_data / "access-om2"
-    catalog_dir = sample_data / "access-om2" / "esmcat"
+    tmp_root = tmp_path_factory.mktemp("access-om2")
+    catalog_dir = tmp_root / "esmcat"
 
-    use_datastore(
-        experiment_dir=data_root,
-        builder=AccessOm2Builder,
-        catalog_dir=catalog_dir,
-        open_ds=True,
-        datastore_name="access-om2",
+    catalog_dir.mkdir(parents=True, exist_ok=True)
+
+    builder = AccessOm2Builder(str(data_root))
+    builder.build()
+    builder.save(
+        name="access-om2",
+        description="Test catalog for ACCESS-OM2",
+        directory=str(catalog_dir),
     )
-    return sample_data / "access-om2" / "esmcat" / "access-om2.json"
+
+    return catalog_dir / "access-om2.json"
 
 
 class TestIcechunkStoreBuilder:
