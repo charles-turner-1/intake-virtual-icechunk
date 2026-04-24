@@ -105,17 +105,17 @@ class IcechunkStoreBuilder:
 
     def __init__(
         self,
-        esm_datastore_path: str,
+        esm_datastore_path: Path | str,
         esm_datastore_kwargs: dict | None,
-        store_path: str,
+        store_path: Path | str,
         parser: VirtualizarrParser | None = None,
         storage_options: dict | None = None,
         store_options: dict | None = None,
     ):
-        self.esm_datastore_path = esm_datastore_path
+        self.esm_datastore_path = str(esm_datastore_path)
         self.esm_datastore_kwargs = esm_datastore_kwargs or {}
 
-        self.store_path = store_path
+        self.store_path = str(store_path)
         self._esm_ds: esm_datastore | None = None
 
         self.storage_options = storage_options or {}

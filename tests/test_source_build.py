@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import icechunk
 import intake
 import pytest
 import virtualizarr
@@ -7,6 +8,7 @@ from intake_esm import esm_datastore
 from pandas.testing import assert_frame_equal
 
 from intake_virtual_icechunk.source import IcechunkStoreBuilder
+from intake_virtual_icechunk.utils import _intake_cat_filename
 
 __all__ = ["IcechunkStoreBuilder", "pytest"]
 
@@ -108,3 +110,45 @@ class TestIcechunkStoreBuilder:
         inferred_parser = builder._infer_parser()
 
         assert inferred_parser == parser
+
+    def test_clean_build(self, om2_esmds_path, intake_esm_kwargs, tmpdir):
+        """
+        Test that the build method creates an IcechunkStore with the expected
+        store type and storage options.
+        """
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            om2_esmds_path, intake_esm_kwargs, dummy_store_path
+        )
+        builder.build()
+
+        assert Path(builder.store_path).exists()
+        assert Path(builder.store_path).is_dir()
+
+        fname = _intake_cat_filename(builder.store_path)
+
+        assert builder.failed_list == []
+        assert (Path(builder.store_path) / fname).exists()
+
+    def test_build_all_failures(self, om2_esmds_path, intake_esm_kwargs, tmpdir):
+        """
+        Test that the build method creates an IcechunkStore with the expected
+        store type and storage options. To ensure we have some failuers, we're
+        going to change the parser
+        """
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            om2_esmds_path,
+            intake_esm_kwargs,
+            dummy_store_path,
+            parser=virtualizarr.parsers.ZarrParser,
+        )
+        with pytest.raises(
+            icechunk.IcechunkError,
+            match="cannot commit, no changes made to the session",
+        ):
+            builder.build()
+
+        # If the build failed, we should have a list of all the datasets that failed and why
+        assert len(builder.failed_list) == len(builder.esm_ds.keys())
+        assert set(fl[0] for fl in builder.failed_list) == set(builder.esm_ds.keys())
