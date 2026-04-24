@@ -1,5 +1,3 @@
-import json
-import os
 from pathlib import Path
 
 import icechunk
@@ -33,12 +31,6 @@ def local_om2_datastore_path(sample_data, tmp_path_factory) -> Path:
     )
 
     catalog_path = catalog_dir / "access-om2.json"
-
-    # Hack for windows, which doesnjt like 'file://' urls in intake-esm catalogs.
-    if os.name == "nt":
-        catalog = json.loads(catalog_path.read_text())
-        catalog["catalog_file"] = str((catalog_dir / "access-om2.csv").resolve())
-        catalog_path.write_text(json.dumps(catalog, indent=2))
 
     return catalog_path
 
