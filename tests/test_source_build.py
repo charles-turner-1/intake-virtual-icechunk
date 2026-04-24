@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import icechunk
 import intake
@@ -153,7 +154,7 @@ class TestIcechunkStoreBuilder:
     ):
         """
         Test that the build method creates an IcechunkStore with the expected
-        store type and storage options. To ensure we have some failuers, we're
+        store type and storage options. To ensure we have some failures, we're
         going to change the parser
         """
         dummy_store_path = tmpdir / "dummy_store.icechunk"
@@ -172,3 +173,90 @@ class TestIcechunkStoreBuilder:
         # If the build failed, we should have a list of all the datasets that failed and why
         assert len(builder.failed_list) == len(builder.esm_ds.keys())
         assert set(fl[0] for fl in builder.failed_list) == set(builder.esm_ds.keys())
+
+    def test_build_not_concat_dim_issue(
+        self,
+        local_om2_datastore_path,
+        intake_esm_kwargs,
+        tmpdir,
+    ):
+        """
+        Test that the build method creates an IcechunkStore with the expected
+        store type and storage options. To ensure we have some failures, we're
+        going to change the parser to one that doesn't support concatenation along a dimension.
+        This should trigger a specific failure mode that we want to check is handled correctly.
+        """
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            local_om2_datastore_path,
+            intake_esm_kwargs,
+            dummy_store_path,
+        )
+
+        with pytest.raises(
+            icechunk.IcechunkError,
+            match="cannot commit, no changes made to the session",
+        ):
+            with patch(
+                "intake_virtual_icechunk.source._build.open_virtual_mfdataset",
+                side_effect=RuntimeError("Something stupid"),
+            ):
+                builder.build()
+
+        assert len(builder.failed_list) == len(builder.esm_ds.keys())
+        assert set(fl[0] for fl in builder.failed_list) == set(builder.esm_ds.keys())
+
+        with pytest.raises(RuntimeError, match="Something stupid"):
+            raise builder.failed_list[0][1]
+
+    def test_build_concat_dim_issue(
+        self,
+        local_om2_datastore_path,
+        intake_esm_kwargs,
+        tmpdir,
+    ):
+        """
+        Test that the build method creates an IcechunkStore with the expected
+        store type and storage options. To ensure we have some failures, we're
+        going to change the parser to one that doesn't support concatenation along a dimension.
+        This should trigger a specific failure mode that we want to check is handled correctly.
+        """
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            local_om2_datastore_path,
+            intake_esm_kwargs,
+            dummy_store_path,
+        )
+
+        with pytest.raises(
+            icechunk.IcechunkError,
+            match="cannot commit, no changes made to the session",
+        ):
+            with patch(
+                "intake_virtual_icechunk.source._build.open_virtual_mfdataset",
+                side_effect=ValueError("Something stupid"),
+            ):
+                builder.build()
+
+        assert len(builder.failed_list) == len(builder.esm_ds.keys())
+        assert set(fl[0] for fl in builder.failed_list) == set(builder.esm_ds.keys())
+
+        with pytest.raises(ValueError, match="Something stupid"):
+            raise builder.failed_list[0][1]
+
+        dummy_store_path_2 = tmpdir / "dummy_store2.icechunk"
+        builder_2 = IcechunkStoreBuilder(
+            local_om2_datastore_path,
+            intake_esm_kwargs,
+            dummy_store_path_2,
+        )
+
+        with patch(
+            "intake_virtual_icechunk.source._build.open_virtual_mfdataset",
+            side_effect=ValueError(
+                "Could not find any dimension coordinates to use to order the Dataset objects for concatenation"
+            ),
+        ):
+            builder_2.build()
+
+        assert builder_2.failed_list == []

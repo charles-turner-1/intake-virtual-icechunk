@@ -306,7 +306,7 @@ class IcechunkStoreBuilder:
                     zarr_group.attrs.update(group_attrs)
 
                     print(f"Virtualised group {public_key} successfully!")
-                except ValueError as e:
+                except Exception as e:
                     if (
                         "Could not find any dimension coordinates to use to order the Dataset objects for concatenation"
                         not in str(e)
