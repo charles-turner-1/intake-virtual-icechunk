@@ -4,10 +4,11 @@ from __future__ import annotations
 # SPDX-License-Identifier: Apache-2.0
 from dataclasses import astuple, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import icechunk
 import intake
+import pandas as pd
 import zarr
 from intake_esm.core import esm_datastore
 from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
@@ -280,6 +281,13 @@ class IcechunkStoreBuilder:
                 grouped = esmcat.grouped
                 group_df = grouped.get_group(internal_key)
 
+                search_term = dict(zip(groupby_attrs, internal_key))
+                esm_ds_metadata: dict[str, list[Any] | Any] = (
+                    self._clean_esmds_metadata(
+                        self.esm_ds.search(**search_term).unique().to_dict()
+                    )
+                )
+
                 # Collect group-level metadata for .zattrs
                 group_attrs: dict = {}
                 for attr in groupby_attrs:
@@ -302,8 +310,19 @@ class IcechunkStoreBuilder:
 
                     # Write group metadata into .zattrs so the catalog can search
                     # these groups without opening the arrays.
+                    # We also want to attach metadata from the intake-esm catalog
+                    # at this point. We don't need to attach things like variable
+                    # names, because we can get those direct from the groups, but
+                    # things like 'frequency', etc. will need to be included.
+
+                    # To keep life simple, we'll just attach everything, and then
+                    # compute variables, coordinates, dimensions etc. on the fly later
                     zarr_group = zarr.open_group(store, path=public_key, mode="a")
-                    zarr_group.attrs.update(group_attrs)
+                    # Would make more sense to merge group_attrs and esm_ds_metadata
+                    # first in a sensible way
+                    self._attach_catalog_metadata(
+                        zarr_group, group_df, group_attrs, esm_ds_metadata
+                    )
 
                     print(f"Virtualised group {public_key} successfully!")
                 except Exception as e:
@@ -324,7 +343,9 @@ class IcechunkStoreBuilder:
                         # Write group metadata into .zattrs so the catalog can search
                         # these groups without opening the arrays.
                         zarr_group = zarr.open_group(store, path=public_key, mode="a")
-                        zarr_group.attrs.update(group_attrs)
+                        self._attach_catalog_metadata(
+                            zarr_group, group_df, group_attrs, esm_ds_metadata
+                        )
 
                         print(f"Virtualised group {public_key} successfully!")
 
@@ -348,3 +369,47 @@ class IcechunkStoreBuilder:
             ),
         )
         model.save(sidecar_fname, directory=sidecar_dir or None)
+
+    def _attach_catalog_metadata(
+        self,
+        zarr_group: zarr.Group,
+        group_df: pd.DataFrame,
+        group_attrs: dict,
+        esm_ds_metadata: dict,
+    ) -> None:
+        """
+        Attach relevant metadata from the intake-esm catalog to the zarr group as attributes.
+        This is important for the catalog to be able to search and filter groups without
+        having to open the arrays.
+
+        For now, we'll just attach the groupby_attrs, but we could also consider attaching
+        other metadata from the catalog if needed.
+        """
+        zarr_group.attrs.update(group_attrs)
+
+        zarr_group.attrs.update(esm_ds_metadata)
+
+        for column in group_df.columns:
+            if column not in zarr_group.attrs:
+                zarr_group.attrs[column] = group_df[column].iloc[0]
+
+    def _clean_esmds_metadata(
+        self, esm_ds_metadata: dict[str, list[Any]]
+    ) -> dict[str, Any | list[Any] | None]:
+        """
+        Clean the metadata from the intake-esm datastore to remove any values that are not JSON serializable,
+        since we want to attach this metadata to the zarr group's .zattrs, which must be JSON serializable.
+
+        For now, we'll just convert any non-JSON-serializable values to strings, but we could consider more
+        sophisticated cleaning if needed. Typing will obviously need cleaning up.
+        """
+        cleaned_metadata: dict[str, Any | list[Any] | None] = {}
+        for key, value in esm_ds_metadata.items():
+            if not len(value):
+                cleaned_metadata[key] = None
+            try:
+                pd.io.json.dumps(value)
+                cleaned_metadata[key] = value
+            except TypeError:
+                cleaned_metadata[key] = str(value)
+        return cleaned_metadata
