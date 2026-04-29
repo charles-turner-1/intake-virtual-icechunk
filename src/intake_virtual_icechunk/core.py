@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import sys
+from functools import cached_property
 from pathlib import Path
 
 import pandas as pd
@@ -372,7 +373,7 @@ class IcechunkCatalog(Catalog):
         ]
         return IcechunkCatalog._from_parent(self, matched)
 
-    @property
+    @cached_property
     def df(self) -> pd.DataFrame:
         """
         Return a :class:`~pandas.DataFrame` of all catalog entry metadata.
@@ -384,10 +385,30 @@ class IcechunkCatalog(Catalog):
         """
         records = []
         for key in self.keys():
+            _df = IcechunkDataSource(
+                key=key,
+                store=self._zarr_store,
+                group=key,
+                storage_options=self.storage_options,
+            ).to_xarray()
             row: dict = {"key": key}
-            row.update(dict(self._root_group[key].attrs))
+            row.update(
+                {"Variable": list(_df.data_vars) or None}
+            )  # grid files might be none - better that than an empty list which is more likely to cause confusion
+            row.update({"Coordinates": list(_df.coords)})
+            row.update({"Dimensions": list(_df.dims)})
+
+            keys = [k.lower() for k in row.keys()]
+            attrs = {
+                k: v
+                for k, v in self._root_group[key].attrs.items()
+                if k.lower() not in keys
+            }
+
+            row.update(attrs)
+
             records.append(row)
-        return pd.DataFrame(records)
+        return pd.DataFrame(records).set_index("key", drop=True)
 
     def to_dataset_dict(
         self,
