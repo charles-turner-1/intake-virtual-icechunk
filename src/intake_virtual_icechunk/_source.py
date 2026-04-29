@@ -110,9 +110,6 @@ class IcechunkDataSource(DataSource):
         self._load_metadata()
         return self.ds
 
-    def _get_partition(self, i: int) -> xr.Dataset:
-        return self.to_xarray()
-
     def close(self) -> None:
         """Drop the open dataset from memory."""
         self._ds = None
