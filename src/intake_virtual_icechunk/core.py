@@ -390,7 +390,7 @@ class IcechunkCatalog(Catalog):
                 store=self._zarr_store,
                 group=key,
                 storage_options=self.storage_options,
-            ).to_dask()
+            ).to_xarray()
             row: dict = {"key": key}
             row.update(
                 {"Variable": list(_df.data_vars) or None}
