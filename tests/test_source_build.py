@@ -260,3 +260,26 @@ class TestIcechunkStoreBuilder:
             builder_2.build()
 
         assert builder_2.failed_list == []
+
+    def test_build_deiters_cols(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """
+        Test that the build method correctly de-iterates columns specified in the cols_to_deiter argument.
+        This is a regression test for a specific issue we had where if the column to de-iterate had some null values, the de-iteration would fail.
+        """
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            local_om2_datastore_path,
+            intake_esm_kwargs,
+            dummy_store_path,
+            cols_to_deiter=["variable_cell_methods"],
+        )
+
+        builder.build()
+
+        # Now open the built stoer and check that the variable_cell_methods column has been de-iterated correctly
+        cat = intake.open_virtual_icechunk(str(dummy_store_path))
+
+        assert "variable_cell_methods" in cat.df.columns
+        assert cat.df.loc["ocean.fx.xt_ocean:1.yt_ocean:1.point"].Variable is None

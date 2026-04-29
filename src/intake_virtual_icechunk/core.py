@@ -383,7 +383,9 @@ class IcechunkCatalog(Catalog):
                 storage_options=self.storage_options,
             ).to_dask()
             row: dict = {"key": key}
-            row.update({"Variable": list(_df.data_vars)})
+            row.update(
+                {"Variable": list(_df.data_vars) or None}
+            )  # grid files might be none - better that than an empty list which is more likely to cause confusion
             row.update({"Coordinates": list(_df.coords)})
             row.update({"Dimensions": list(_df.dims)})
 
