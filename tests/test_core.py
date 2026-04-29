@@ -248,5 +248,5 @@ class TestIcechunkCatalogToXarray:
         with pytest.warns(
             # FutureWarning,
             match=r"to_dask\(\) is deprecated; use to_xarray\(\) instead\.",
-        ) as record:
-            ds = cat.search(filename="ocean.nc").to_dask()
+        ):
+            cat.search(filename="ocean.nc").to_dask()

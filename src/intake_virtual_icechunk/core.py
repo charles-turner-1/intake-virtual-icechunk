@@ -467,7 +467,6 @@ class IcechunkCatalog(Catalog):
         "to_dask() is deprecated; use to_xarray() instead.", category=FutureWarning
     )
     def to_dask(self, *args, **kwargs):
-
         if sys.version_info < (3, 13):
             import warnings
 
