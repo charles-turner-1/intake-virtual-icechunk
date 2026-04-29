@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 # Copyright 2026 ACCESS-NRI and contributors. See the top-level COPYRIGHT file for details.
 # SPDX-License-Identifier: Apache-2.0
 from dataclasses import astuple, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import icechunk
 import intake
+import pandas as pd
+import polars as pl
 import zarr
 from intake_esm.core import esm_datastore
+from intake_esm.utils import MinimalExploder
 from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
 
 from intake_virtual_icechunk.source._containers import VirtualChunkContainerModel
@@ -101,6 +106,14 @@ class IcechunkStoreBuilder:
         Keyword arguments forwarded to the Icechunk storage backend. See _resolve_storage() for details.
     store_options: dict, optional
 
+    drop_cols: list[str], optional
+        List of column names in the intake-esm catalog's assets dataframe to ignore when attaching metadata.
+        the `path` column is always ignored - drop cols allows you to remove other metadata columns that
+        might no longer make sense, post virtualisation.
+    cols_to_deiter: list[str], optional
+        Intake-ESM supports columns with iterable values, which it represents as lists. Some of these will no
+        longer make sense to keep as lists post virtualisation. This argument allows you to specify columns to
+        transform from iterabls to scalars by taking the first value in each row, post deduplication.
     """
 
     def __init__(
@@ -111,6 +124,8 @@ class IcechunkStoreBuilder:
         parser: VirtualizarrParser | None = None,
         storage_options: dict | None = None,
         store_options: dict | None = None,
+        drop_cols: list[str] | None = None,
+        cols_to_deiter: list[str] | None = None,
     ):
         self.esm_datastore_path = str(esm_datastore_path)
         self.esm_datastore_kwargs = esm_datastore_kwargs or {}
@@ -120,6 +135,9 @@ class IcechunkStoreBuilder:
 
         self.storage_options = storage_options or {}
         self.store_options = store_options or {}
+        self.drop_cols = drop_cols or []
+        self.cols_to_deiter = cols_to_deiter or []
+
         parser = parser or self._infer_parser()
         self.parser = parser()
 
@@ -241,6 +259,8 @@ class IcechunkStoreBuilder:
         esmcat = self.esm_ds.esmcat
         groupby_attrs, assets_col = astuple(self._extract_datastore_structure())
 
+        _drop_cols = list(set(self.drop_cols + [assets_col]))
+        self.drop_cols = _drop_cols
         # Resolve registry first so self.source_url_prefix is available for the
         # VirtualChunkContainer config below.
         self._create_registry()
@@ -278,13 +298,14 @@ class IcechunkStoreBuilder:
         ) as store:
             for public_key, internal_key in group_key_map.items():
                 grouped = esmcat.grouped
-                group_df = grouped.get_group(internal_key)
+                group_df: pd.DataFrame = grouped.get_group(internal_key)
 
                 # Collect group-level metadata for .zattrs
                 group_attrs: dict = {}
                 for attr in groupby_attrs:
                     if attr in group_df.columns:
                         group_attrs[attr] = group_df[attr].iloc[0]
+                # ^ Still necessary?
 
                 # Collect asset file paths for this group
                 file_paths: list[str] = group_df[assets_col].tolist()
@@ -302,8 +323,19 @@ class IcechunkStoreBuilder:
 
                     # Write group metadata into .zattrs so the catalog can search
                     # these groups without opening the arrays.
+                    # We also want to attach metadata from the intake-esm catalog
+                    # at this point. We don't need to attach things like variable
+                    # names, because we can get those direct from the groups, but
+                    # things like 'frequency', etc. will need to be included.
+
+                    # To keep life simple, we'll just attach everything, and then
+                    # compute variables, coordinates, dimensions etc. on the fly later
                     zarr_group = zarr.open_group(store, path=public_key, mode="a")
-                    zarr_group.attrs.update(group_attrs)
+                    # Would make more sense to merge group_attrs and esm_ds_metadata
+                    # first in a sensible way
+                    self._attach_catalog_metadata(
+                        zarr_group, group_df.drop(columns=_drop_cols), group_attrs
+                    )
 
                     print(f"Virtualised group {public_key} successfully!")
                 except Exception as e:
@@ -324,7 +356,7 @@ class IcechunkStoreBuilder:
                         # Write group metadata into .zattrs so the catalog can search
                         # these groups without opening the arrays.
                         zarr_group = zarr.open_group(store, path=public_key, mode="a")
-                        zarr_group.attrs.update(group_attrs)
+                        self._attach_catalog_metadata(zarr_group, group_df, group_attrs)
 
                         print(f"Virtualised group {public_key} successfully!")
 
@@ -348,3 +380,58 @@ class IcechunkStoreBuilder:
             ),
         )
         model.save(sidecar_fname, directory=sidecar_dir or None)
+
+    def _attach_catalog_metadata(
+        self,
+        zarr_group: zarr.Group,
+        group_df: pd.DataFrame,
+        group_attrs: dict,
+    ) -> None:
+        """
+        Attach relevant metadata from the intake-esm catalog to the zarr group as attributes.
+        This is important for the catalog to be able to search and filter groups without
+        having to open the arrays.
+
+        For now, we'll just attach the groupby_attrs, but we could also consider attaching
+        other metadata from the catalog if needed.
+        """
+
+        exploded_metadata: Mapping[str, list[Any] | None] = (
+            MinimalExploder(pl.from_pandas(group_df))()
+            .unique()
+            .to_dict(as_series=False)
+        )
+
+        # No None type until we deiter columns
+        exploded_metadata = {
+            k: [val for val in set(v) if val]  # type: ignore[arg-type]
+            for k, v in exploded_metadata.items()
+        }
+
+        for col in self.cols_to_deiter:
+            try:
+                exploded_metadata[col] = exploded_metadata.get(col, [None])[0]  # type: ignore[index]
+            except IndexError:
+                exploded_metadata[col] = None
+
+        # And remove any cols we want to drop
+        exploded_metadata = {
+            k: v for k, v in exploded_metadata.items() if k not in self.drop_cols
+        }
+
+        # Do exploded metadata first so it takes precedence over the groupby attrs,
+        # which are more likely to have unimportant comments from NCO, etc.
+        # TODO: Figure out if we can keep the order stable?
+
+        group_attrs = {
+            k: v
+            for k, v in group_attrs.items()
+            if k not in exploded_metadata and k not in self.drop_cols
+        }
+
+        zarr_group.attrs.update(exploded_metadata)
+        zarr_group.attrs.update(group_attrs)
+
+        for column in group_df.columns:
+            if column not in zarr_group.attrs:
+                zarr_group.attrs[column] = group_df[column].iloc[0]
