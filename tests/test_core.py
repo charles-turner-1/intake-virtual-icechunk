@@ -288,6 +288,14 @@ class TestIcechunkCatalog:
             ),
         )
 
+    def test_repr_html(self, icechunk_store_path):
+        cat = IcechunkCatalog(store=icechunk_store_path)
+        html = cat._repr_html_()
+        assert (
+            html
+            == '<p><strong>_intake_icecat catalog with 6 dataset(s) from 6 asset(s)</strong>:</p> <div>\n<style scoped>\n    .dataframe tbody tr th:only-of-type {\n        vertical-align: middle;\n    }\n\n    .dataframe tbody tr th {\n        vertical-align: top;\n    }\n\n    .dataframe thead th {\n        text-align: right;\n    }\n</style>\n<table border="1" class="dataframe">\n  <thead>\n    <tr style="text-align: right;">\n      <th></th>\n      <th>0</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <th>Variable</th>\n      <td>7</td>\n    </tr>\n    <tr>\n      <th>Coordinates</th>\n      <td>10</td>\n    </tr>\n    <tr>\n      <th>Dimensions</th>\n      <td>9</td>\n    </tr>\n    <tr>\n      <th>filename</th>\n      <td>5</td>\n    </tr>\n    <tr>\n      <th>title</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>grid_type</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>grid_tile</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>history</th>\n      <td>6</td>\n    </tr>\n    <tr>\n      <th>NCO</th>\n      <td>1</td>\n    </tr>\n    <tr>\n      <th>file_id</th>\n      <td>6</td>\n    </tr>\n    <tr>\n      <th>temporal_label</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>contents</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>source</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>comment</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>comment2</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>comment3</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>conventions</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>io_flavor</th>\n      <td>2</td>\n    </tr>\n  </tbody>\n</table>\n</div>'
+        )
+
 
 @pytest.mark.parametrize(
     "dataframe, expected",

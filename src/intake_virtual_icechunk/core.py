@@ -288,7 +288,7 @@ class IcechunkCatalog(Catalog):
 
         return f"<p><strong>{self._id or ''} catalog with {len(self)} dataset(s) from {len(self.df)} asset(s)</strong>:</p> {text}"
 
-    def _ipython_display_(self):
+    def _ipython_display_(self):  # pragma: no cover
         """
         Display the entry as a rich object in an IPython session
         """
