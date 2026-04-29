@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from functools import cached_property
 from typing import Any
 
 import xarray as xr
@@ -70,7 +71,7 @@ class IcechunkDataSource(DataSource):
     def __repr__(self) -> str:
         return f"<IcechunkDataSource (key: {self.key}, store: {self.store!r})>"
 
-    @property
+    @cached_property
     def ds(self) -> xr.Dataset:
         """The xarray Dataset for this data source."""
         if self._ds is None:
