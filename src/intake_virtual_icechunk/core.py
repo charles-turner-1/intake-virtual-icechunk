@@ -392,16 +392,7 @@ class IcechunkCatalog(Catalog):
         Get the number of unique values for each column in the catalog DataFrame.
         Coverts to polars to handle this because why not. Pandas sucks
         """
-        pl_df = pl.from_pandas(self.df)
-
-        return pd.Series(
-            {
-                colname: pl_df.get_column(colname).explode().n_unique()
-                if pl_df.schema[colname] == pl.List
-                else pl_df.get_column(colname).n_unique()
-                for colname in pl_df.columns
-            }
-        )
+        return _nunique(pl.from_pandas(self.df))
 
     @cached_property
     def df(self) -> pd.DataFrame:
@@ -532,3 +523,18 @@ class IcechunkCatalog(Catalog):
                 stacklevel=2,
             )
         return self.to_xarray(*args, **kwargs)
+
+
+def _nunique(pl_df: pl.DataFrame) -> pd.Series:
+    """
+    Get the number of unique values for each column a polars DataFrame.
+    Returns a pandas Series for convenience.
+    """
+    return pd.Series(
+        {
+            colname: pl_df.get_column(colname).explode().n_unique()
+            if pl_df.schema[colname] == pl.List
+            else pl_df.get_column(colname).n_unique()
+            for colname in pl_df.columns
+        }
+    )

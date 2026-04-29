@@ -250,3 +250,14 @@ class TestIcechunkCatalogToXarray:
             match=r"to_dask\(\) is deprecated; use to_xarray\(\) instead\.",
         ):
             cat.search(filename="ocean.nc").to_dask()
+
+
+class TestIcechunkCatalog:
+    """
+    This class has *not* been human audited.
+    """
+
+    def test_nunique(self, icechunk_store_path):
+        cat = IcechunkCatalog(store=icechunk_store_path)
+        uniques = cat.nunique()
+        breakpoint()
