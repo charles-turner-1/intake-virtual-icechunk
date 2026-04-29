@@ -1,7 +1,7 @@
 # intake-virtual-icechunk
 
 > [!WARNING]
-> This package has been scaffolded by Claude but none of the implementation is complete yet.
+> This package has been scaffolded by Claude but not all of the implementation is complete yet.
 > APIs, class names, and behaviour are all subject to change.
 
 An intake plugin for building and reading [Icechunk](https://icechunk.io) stores via
