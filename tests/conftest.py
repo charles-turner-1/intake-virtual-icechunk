@@ -59,9 +59,6 @@ def esm_datastore_path(sample_data, tmp_path_factory) -> Path:
 
     data_root = sample_data / "access-om2"
 
-    # catalog_dir = sample_data / "access-om2" / "esmcat"
-    # esmcat_path = tmp_path_factory.mktemp("access-om2") / "icecat.icechunk"
-
     catalog_dir = tmp_path_factory.mktemp("access-om2") / "esmcat"
     catalog_dir.mkdir(parents=True, exist_ok=True)
 
@@ -72,18 +69,18 @@ def esm_datastore_path(sample_data, tmp_path_factory) -> Path:
         open_ds=True,
         datastore_name="access-om2",
     )
-    return sample_data / "access-om2" / "esmcat" / "access-om2.json"
+    return catalog_dir / "access-om2.json"
 
 
 @pytest.fixture(scope="session")
-def icechunk_store_path(sample_data, esm_datastore_path, tmp_path_factory) -> Path:
+def icechunk_store_path(esm_datastore_path, tmp_path_factory) -> Path:
     """
     Use a minimal icechunk store for testing. This needs to be rebuilt at the
     start of each test session, or virtualizarr will complain about manifests not
     being up to date.
     """
+
     cat_path = tmp_path_factory.mktemp("access-om2") / "icecat.icechunk"
-    # esmcat_path = sample_data / "access-om2" / "esmcat" / "access-om2.json"
 
     iscb = IcechunkStoreBuilder(
         esm_datastore_path=esm_datastore_path,
