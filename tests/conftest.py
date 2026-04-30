@@ -3,7 +3,13 @@
 
 from pathlib import Path
 
+from dask.distributed import Client
+
+client = Client(threads_per_worker=1)
+
 import pytest
+
+from intake_virtual_icechunk.source import IcechunkStoreBuilder
 
 
 @pytest.fixture(scope="session")
@@ -41,12 +47,57 @@ def groups():
     ]
 
 
-@pytest.fixture
-def icechunk_store_path(sample_data) -> Path:
+@pytest.fixture(scope="session")
+def esm_datastore_path(sample_data, tmp_path_factory) -> Path:
     """
-    Use a minimal icechunk store for testing. This is
+    Before building an icechunk store, we need an esm_datastore to build from!
+    This is a minimal fixture to do that.
     """
-    return sample_data / "access-om2" / "icecat.icechunk"
+
+    from access_nri_intake.experiment import use_datastore
+    from access_nri_intake.source.builders import AccessOm2Builder
+
+    data_root = sample_data / "access-om2"
+
+    catalog_dir = tmp_path_factory.mktemp("access-om2") / "esmcat"
+    catalog_dir.mkdir(parents=True, exist_ok=True)
+
+    use_datastore(
+        experiment_dir=data_root,
+        builder=AccessOm2Builder,
+        catalog_dir=catalog_dir,
+        open_ds=True,
+        datastore_name="access-om2",
+    )
+    return catalog_dir / "access-om2.json"
+
+
+@pytest.fixture(scope="session")
+def icechunk_store_path(esm_datastore_path, tmp_path_factory) -> Path:
+    """
+    Use a minimal icechunk store for testing. This needs to be rebuilt at the
+    start of each test session, or virtualizarr will complain about manifests not
+    being up to date.
+    """
+
+    cat_path = tmp_path_factory.mktemp("access-om2") / "icecat.icechunk"
+
+    iscb = IcechunkStoreBuilder(
+        esm_datastore_path=esm_datastore_path,
+        store_path=cat_path,
+        drop_cols=[
+            "filename",
+            # "path", # This should be droppped automatically...
+            "start_date",
+            "end_date",
+            "file_id",
+            "temporal_label",
+        ],
+    )
+
+    iscb.build()
+
+    return cat_path
 
 
 @pytest.fixture

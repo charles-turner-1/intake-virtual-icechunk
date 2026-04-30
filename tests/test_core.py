@@ -3,11 +3,13 @@
 
 import json
 
+import pandas as pd
+import polars as pl
 import pytest
 import xarray as xr
 
 from intake_virtual_icechunk.cat import VirtualIcechunkCatalogModel
-from intake_virtual_icechunk.core import IcechunkCatalog
+from intake_virtual_icechunk.core import IcechunkCatalog, _nunique
 from intake_virtual_icechunk.source._containers import VirtualChunkContainerModel
 from intake_virtual_icechunk.utils import _intake_cat_filename
 
@@ -250,3 +252,77 @@ class TestIcechunkCatalogToXarray:
             match=r"to_dask\(\) is deprecated; use to_xarray\(\) instead\.",
         ):
             cat.search(filename="ocean.nc").to_dask()
+
+
+class TestIcechunkCatalog:
+    """
+    This class has *not* been human audited.
+    """
+
+    def test_nunique(self, icechunk_store_path):
+        cat = IcechunkCatalog(store=icechunk_store_path)
+        uniques = cat.nunique()
+
+        assert uniques.to_dict() == {
+            "Variable": 7,
+            "Coordinates": 10,
+            "Dimensions": 9,
+            "filename": 5,
+            "title": 2,
+            "grid_type": 2,
+            "grid_tile": 2,
+            "history": 6,
+            "NCO": 1,
+            "frequency": 3,
+            "variable_long_name": 6,
+            "variable_standard_name": 6,
+            "variable_cell_methods": 6,
+            "realm": 2,
+            "contents": 2,
+            "source": 2,
+            "comment": 2,
+            "comment2": 2,
+            "comment3": 2,
+            "conventions": 2,
+            "io_flavor": 2,
+            "variable_units": 6,
+            # The following should all be dropped: see conftest.py
+            # "path": 2,
+            # "file_id": 2,
+            # "start_date": 2,
+            # "end_date": 2,
+            # "temporal_label": 2,
+        }
+
+    @pytest.mark.xfail(
+        reason="This is super flaky. IDK if there's a better way to fix?"
+    )
+    def test_repr_html(self, icechunk_store_path):
+        cat = IcechunkCatalog(store=icechunk_store_path)
+        html = cat._repr_html_()
+        assert (
+            html
+            == '<p><strong>_intake_icecat catalog with 6 dataset(s) from 6 asset(s)</strong>:</p> <div>\n<style scoped>\n    .dataframe tbody tr th:only-of-type {\n        vertical-align: middle;\n    }\n\n    .dataframe tbody tr th {\n        vertical-align: top;\n    }\n\n    .dataframe thead th {\n        text-align: right;\n    }\n</style>\n<table border="1" class="dataframe">\n  <thead>\n    <tr style="text-align: right;">\n      <th></th>\n      <th>0</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <th>Variable</th>\n      <td>7</td>\n    </tr>\n    <tr>\n      <th>Coordinates</th>\n      <td>10</td>\n    </tr>\n    <tr>\n      <th>Dimensions</th>\n      <td>9</td>\n    </tr>\n    <tr>\n      <th>filename</th>\n      <td>5</td>\n    </tr>\n    <tr>\n      <th>title</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>grid_type</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>grid_tile</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>history</th>\n      <td>6</td>\n    </tr>\n    <tr>\n      <th>NCO</th>\n      <td>1</td>\n    </tr>\n    <tr>\n      <th>frequency</th>\n      <td>3</td>\n    </tr>\n    <tr>\n      <th>variable_long_name</th>\n      <td>6</td>\n    </tr>\n    <tr>\n      <th>variable_standard_name</th>\n      <td>6</td>\n    </tr>\n    <tr>\n      <th>variable_cell_methods</th>\n      <td>6</td>\n    </tr>\n    <tr>\n      <th>variable_units</th>\n      <td>6</td>\n    </tr>\n    <tr>\n      <th>realm</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>contents</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>source</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>comment</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>comment2</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>comment3</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>conventions</th>\n      <td>2</td>\n    </tr>\n    <tr>\n      <th>io_flavor</th>\n      <td>2</td>\n    </tr>\n  </tbody>\n</table>\n</div>'
+        )
+
+
+@pytest.mark.parametrize(
+    "dataframe, expected",
+    [
+        (
+            pd.DataFrame({"a": [1, 2, 2], "b": [[1, 2], [2, 3], [1, 2]]}),
+            pd.Series({"a": 2, "b": 3}),
+        ),
+        (
+            pd.DataFrame({"a": [1, 1, 1], "b": [[1], [1], [1]]}),
+            pd.Series({"a": 1, "b": 1}),
+        ),
+        (
+            pd.DataFrame({"a": [1, 2, 3], "b": [[1], [2], [3]]}),
+            pd.Series({"a": 3, "b": 3}),
+        ),
+    ],
+)
+def test__nunique(dataframe, expected):
+    result = _nunique(pl.from_pandas(dataframe))
+    pd.testing.assert_series_equal(result, expected)

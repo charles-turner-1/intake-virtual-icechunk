@@ -9,6 +9,7 @@ from functools import cached_property
 from pathlib import Path
 
 import pandas as pd
+import polars as pl
 import zarr
 from intake.catalog import Catalog
 
@@ -111,6 +112,7 @@ class IcechunkCatalog(Catalog):
             self.virtual_chunk_model = VirtualChunkContainerModel.from_dict(
                 storage_options or metadata.get("virtual_chunk_model", {})
             )
+            self._id = metadata.get("id", None)
 
         self.virtual_chunk_container = (
             self.virtual_chunk_model.to_virtual_chunk_container()
@@ -278,10 +280,22 @@ class IcechunkCatalog(Catalog):
         return f"<IcechunkCatalog with {len(self)} dataset(s) from {self.store!r}>"
 
     def _repr_html_(self):
-        return (
-            f"<p><strong>IcechunkCatalog with {len(self)} dataset(s)</strong> "
-            f"from <code>{self.store}</code></p>"
-        )
+        """
+        Generate a pretty representation of the catalog for display in Jupyter notebooks.
+        """
+
+        text = pd.DataFrame(self.nunique())._repr_html_()
+
+        return f"<p><strong>{self._id or ''} catalog with {len(self)} dataset(s) from {len(self.df)} asset(s)</strong>:</p> {text}"
+
+    def _ipython_display_(self):  # pragma: no cover
+        """
+        Display the entry as a rich object in an IPython session
+        """
+        from IPython.display import HTML, display
+
+        contents = self._repr_html_()
+        display(HTML(contents))
 
     def __getitem__(self, key: str) -> IcechunkDataSource:
         """
@@ -373,6 +387,13 @@ class IcechunkCatalog(Catalog):
         ]
         return IcechunkCatalog._from_parent(self, matched)
 
+    def nunique(self) -> pd.Series:
+        """
+        Get the number of unique values for each column in the catalog DataFrame.
+        Coverts to polars to handle this because why not. Pandas sucks
+        """
+        return _nunique(pl.from_pandas(self.df))
+
     @cached_property
     def df(self) -> pd.DataFrame:
         """
@@ -390,13 +411,14 @@ class IcechunkCatalog(Catalog):
                 store=self._zarr_store,
                 group=key,
                 storage_options=self.storage_options,
+                xarray_kwargs=self.xarray_kwargs,
             ).to_xarray()
             row: dict = {"key": key}
             row.update(
-                {"Variable": list(_df.data_vars) or None}
+                {"Variable": tuple(_df.data_vars) or None}
             )  # grid files might be none - better that than an empty list which is more likely to cause confusion
-            row.update({"Coordinates": list(_df.coords)})
-            row.update({"Dimensions": list(_df.dims)})
+            row.update({"Coordinates": tuple(_df.coords)})
+            row.update({"Dimensions": tuple(_df.dims)})
 
             keys = [k.lower() for k in row.keys()]
             attrs = {
@@ -408,6 +430,11 @@ class IcechunkCatalog(Catalog):
             row.update(attrs)
 
             records.append(row)
+            # Finally, convert all list columns to tuples
+            records = [
+                {k: tuple(v) if isinstance(v, list) else v for k, v in r.items()}
+                for r in records
+            ]
         return pd.DataFrame(records).set_index("key", drop=True)
 
     def to_dataset_dict(
@@ -497,3 +524,18 @@ class IcechunkCatalog(Catalog):
                 stacklevel=2,
             )
         return self.to_xarray(*args, **kwargs)
+
+
+def _nunique(pl_df: pl.DataFrame) -> pd.Series:
+    """
+    Get the number of unique values for each column a polars DataFrame.
+    Returns a pandas Series for convenience.
+    """
+    return pd.Series(
+        {
+            colname: pl_df.get_column(colname).explode().n_unique()
+            if pl_df.schema[colname] == pl.List
+            else pl_df.get_column(colname).n_unique()
+            for colname in pl_df.columns
+        }
+    )
