@@ -504,8 +504,10 @@ class IcechunkCatalog(Catalog):
             row.update(
                 {"variable": tuple(_df.data_vars) or None}
             )  # grid files might be none - better that than an empty list which is more likely to cause confusion
-            row.update({"coordinate": tuple(_df.coords)})
-            row.update({"dimension": tuple(_df.dims)})
+            row.update(
+                {"coordinates": tuple(_df.coords)}
+            )  # Has to coordinates, not coordinate: zarr stores coords internally as a space seprated list in a single attribute called coordinates.
+            row.update({"dimensions": tuple(_df.dims)})
 
             keys = [k.lower() for k in row.keys()]
             attrs = {
