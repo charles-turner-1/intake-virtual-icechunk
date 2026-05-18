@@ -69,9 +69,7 @@ class TestReadSidecarMetadata:
 
 
 class TestVirtualIcechunkCatalogModel:
-    """
-    This class has been human audited.
-    """
+    """Tests for JSON sidecar model loading, saving, and defaults."""
 
     def test_save_creates_json(self, tmp_path, icechunk_store_path, sample_data):
         fname = _intake_cat_filename(icechunk_store_path)
@@ -84,11 +82,8 @@ class TestVirtualIcechunkCatalogModel:
         model.storage_options = {"key": "value"}
         model.title = "Test"
 
-        # Make sure to update url_prefix in the virtual chunk model to match the
-        # test data, otherwise we will fail moving test data between machines.
-        # Same goes for the store path, which is used in the catalog model's store
-        # field. We should probably create temporary copies rathe than modifying
-        # the test data, but this is easier for now.
+        # Normalise fixture paths so the saved sidecar matches this checkout's
+        # temporary test data location.
         model.store = str(icechunk_store_path)
         model.virtual_chunk_model.url_prefix = url_prefix
 
@@ -113,8 +108,7 @@ class TestVirtualIcechunkCatalogModel:
         assert data["last_updated"] is not None
 
     def test_default_version(self, sample_data, icechunk_store_path):
-        # Extracted from the icechunk store used in testing. We can abstract this
-        # away eventualy I think
+        # Recreate the minimal virtual chunk config used by the fixture store.
         url_prefix = f"file://{sample_data}/access-om2/"
         vc_model_dict = {
             "url_prefix": url_prefix,
@@ -161,18 +155,15 @@ class TestVirtualIcechunkCatalogModel:
 
 
 class TestIcechunkCatalogFromJson:
-    """
-    This class has been human audited. Apparently not very well because there are
-    CI bugs...
-    """
+    """Tests for constructing catalogs from JSON sidecar files."""
 
     @pytest.fixture
     def temp_json_local_path(
         self, icechunk_store_path, catalog_json_path, sample_data, tmpdir
     ) -> str:
         """
-        Rewrites the catalog json to not use a fixture from my local machine. Will
-        need proper cleaning up later, this is a janky fix.
+        Rewrite the fixture catalog JSON so paths point at this test run's
+        temporary Icechunk store and sample data directory.
         """
         with open(catalog_json_path) as f:
             data = json.load(f)
@@ -344,9 +335,7 @@ class TestIcechunkCatalogConstructorKwargs:
 
 
 class TestIcechunkCatalogKeys:
-    """
-    This class has *not* been human audited.
-    """
+    """Tests for the catalog mapping-style key interface."""
 
     def __init__(self, groups):
         self.all_keys = [g["key"] for g in groups]
@@ -529,9 +518,7 @@ class TestIcechunkCatalogSearch:
 
 
 class TestIcechunkCatalogDf:
-    """
-    This class has *not* been human audited.
-    """
+    """Tests for the catalog metadata DataFrame."""
 
     def __init__(self, groups):
         self.all_keys = [g["key"] for g in groups]
@@ -610,9 +597,7 @@ class TestIcechunkCatalogToDatasetDict:
 
 
 class TestIcechunkCatalogToXarray:
-    """
-    This class has *not* been human audited.
-    """
+    """Tests for single-entry conversion and deprecated to_dask compatibility."""
 
     def test_to_xarray_returns_dataset(self, icechunk_store_path):
         cat = IcechunkCatalog(store=icechunk_store_path)
@@ -628,8 +613,9 @@ class TestIcechunkCatalogToXarray:
         import sys
 
         if sys.version_info < (3, 13):
-            # Mark as xfail and return. IDK WTF is going on here with not warning and it's
-            # unimportant. #TODO
+            # On Python < 3.13 the compatibility shim emits the warning
+            # manually; this test is focused on the 3.13+ deprecated decorator
+            # path.
             pytest.xfail("to_dask() is deprecated and raises in Python 3.13+")
             return None
 
@@ -642,9 +628,7 @@ class TestIcechunkCatalogToXarray:
 
 
 class TestIcechunkCatalog:
-    """
-    This class has *not* been human audited.
-    """
+    """Miscellaneous catalog behavior tests."""
 
     def test_nunique(self, icechunk_store_path):
         cat = IcechunkCatalog(store=icechunk_store_path)
@@ -681,9 +665,7 @@ class TestIcechunkCatalog:
             # "temporal_label": 2,
         }
 
-    @pytest.mark.xfail(
-        reason="This is super flaky. IDK if there's a better way to fix?"
-    )
+    @pytest.mark.xfail(reason="The HTML repr test is flaky in current CI.")
     def test_repr_html(self, icechunk_store_path):
         cat = IcechunkCatalog(store=icechunk_store_path)
         html = cat._repr_html_()

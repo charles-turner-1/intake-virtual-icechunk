@@ -287,7 +287,7 @@ class TestIcechunkStoreBuilder:
 
         builder.build()
 
-        # Now open the built stoer and check that the variable_cell_methods column has been de-iterated correctly
+        # Open the built store and check that variable_cell_methods was de-iterated.
         cat = intake.open_virtual_icechunk(str(dummy_store_path))
 
         assert "variable_cell_methods" in cat.df.columns
@@ -377,12 +377,12 @@ class TestIcechunkStoreBuilder:
 
         builder.build()
 
-        # Now open the built stoer and check that the variable_cell_methods column has been de-iterated correctly
+        # Open the built store and check that configured columns were de-iterated.
         cat = intake.open_virtual_icechunk(str(dummy_store_path))
 
         assert "start_date" in cat.df.columns
 
-        # Stupid sentinel value quirk
+        # The fixture represents missing scalar dates with the sentinel string "none".
         assert cat.df.loc["ocean.fx.xt_ocean:1.yt_ocean:1.point"].start_date == "none"
         # Nothing in here for this dataset
         assert (

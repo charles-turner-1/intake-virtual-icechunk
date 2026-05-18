@@ -102,8 +102,16 @@ class IcechunkCatalog(Catalog):
     storage_options : dict, optional
         Credential/config keyword arguments forwarded to the Icechunk storage
         backend (e.g. ``{'from_env': True}`` for S3).
+    sidecar_options : dict, optional
+        obstore config kwargs used only to read the JSON sidecar. When omitted,
+        *storage_options* is reused for the sidecar read.
     xarray_kwargs : dict, optional
         Keyword arguments forwarded to ``xarray.open_zarr()``.
+    virtual_chunk_model : dict or VirtualChunkContainerModel, optional
+        Pre-loaded virtual chunk container configuration. Supplying this skips
+        the sidecar read and is mainly used by ``from_json`` and ``search``.
+    catalog_id : str, optional
+        Catalog identifier loaded from a JSON sidecar.
     intake_kwargs : dict, optional
         Additional keyword arguments passed through to
         :py:class:`~intake.catalog.Catalog`.
@@ -138,9 +146,8 @@ class IcechunkCatalog(Catalog):
         **intake_kwargs,
     ):
         super().__init__(**intake_kwargs)
-        # Path may be passed as a string or a Path, we'll store it internally as
-        # a str, and convert back to a Path if and when where needed.
-        # TBC if this is a good idea.
+        # Keep the store path as a string because Icechunk and obstore helpers
+        # both accept path-like strings and URLs.
         self.store: str = str(store)
 
         if virtual_chunk_model is None:
@@ -418,7 +425,6 @@ class IcechunkCatalog(Catalog):
 
     def search(
         self,
-        # require_all_on: str | list[str] | None = None,
         **query,
     ) -> IcechunkCatalog:
         """
@@ -468,7 +474,9 @@ class IcechunkCatalog(Catalog):
     def nunique(self) -> pd.Series:
         """
         Get the number of unique values for each column in the catalog DataFrame.
-        Coverts to polars to handle this because why not. Pandas sucks
+
+        Iterable-valued columns are exploded before counting so their values are
+        counted individually rather than as whole tuples.
         """
         return _nunique(pl.from_pandas(self.df))
 
@@ -550,10 +558,9 @@ class IcechunkCatalog(Catalog):
             :func:`xarray.open_mfdataset`.
         storage_options : dict, optional
             Storage credentials/config merged with (and taking precedence over)
-            the catalog-level ``storage_options``.  Retained for API parity
-            with ``intake-esm``; note that since the Icechunk store is opened
-            at catalog-instantiation time, these options apply only to
-            subsequent store accesses.
+            the catalog-level ``storage_options`` before constructing each
+            data source. Retained for API parity with ``intake-esm``; the
+            already-opened Icechunk store object does not use these options.
 
         Returns
         -------
@@ -633,7 +640,8 @@ class IcechunkCatalog(Catalog):
 
 def _nunique(pl_df: pl.DataFrame) -> pd.Series:
     """
-    Get the number of unique values for each column a polars DataFrame.
+    Get the number of unique values for each column in a polars DataFrame.
+
     Returns a pandas Series for convenience.
     """
     return pd.Series(
