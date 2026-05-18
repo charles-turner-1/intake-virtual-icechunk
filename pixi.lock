@@ -13245,6 +13245,11 @@ packages:
   - zarr
   - pytest ; extra == 'test'
   - pytest-cov ; extra == 'test'
+  - myst-nb ; extra == 'docs'
+  - numpydoc ; extra == 'docs'
+  - sphinx ; extra == 'docs'
+  - sphinx-book-theme ; extra == 'docs'
+  - sphinx-copybutton ; extra == 'docs'
   - virtualizarr ; extra == 'virtualizarr'
   requires_python: '>=3.12'
 - pypi: https://files.pythonhosted.org/packages/02/10/5da547df7a391dcde17f59520a231527b8571e6f46fc8efb02ccb370ab12/docutils-0.22.4-py3-none-any.whl

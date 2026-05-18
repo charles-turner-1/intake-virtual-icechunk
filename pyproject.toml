@@ -27,6 +27,14 @@ test = [
     "pytest-cov",
 ]
 
+docs = [
+    "myst-nb",
+    "numpydoc",
+    "sphinx",
+    "sphinx-book-theme",
+    "sphinx-copybutton",
+]
+
 virtualizarr = [
     "virtualizarr",
 ]
