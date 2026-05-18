@@ -18,6 +18,7 @@ dependencies = [
     "icechunk",
     "intake-esm",
     "zarr",
+    "obstore",
 ]
 dynamic = ["version"]
 
