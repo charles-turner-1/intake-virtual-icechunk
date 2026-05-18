@@ -14,11 +14,19 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "intake>=2.0.0",
     "icechunk",
+    "intake>=2.0.0",
     "intake-esm",
-    "zarr",
+    "numpy",
     "obstore",
+    "obspec-utils",
+    "pandas",
+    "polars",
+    "pydantic",
+    "typing-extensions",
+    "virtualizarr",
+    "xarray",
+    "zarr",
 ]
 dynamic = ["version"]
 
@@ -34,10 +42,6 @@ docs = [
     "sphinx",
     "sphinx-book-theme",
     "sphinx-copybutton",
-]
-
-virtualizarr = [
-    "virtualizarr",
 ]
 
 [project.urls]

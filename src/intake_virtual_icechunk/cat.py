@@ -37,10 +37,12 @@ class VirtualIcechunkCatalogModel(pydantic.BaseModel):
 
     >>> model = VirtualIcechunkCatalogModel(
     ...     store='s3://my-bucket/my-catalog.icechunk',
+    ...     virtual_chunk_model=virtual_chunk_model,
     ...     storage_options={'from_env': True},
     ...     description='My climate catalog',
     ... )
-    >>> model.save('my-catalog', directory='/path/to/output')
+    >>> from obstore.store import from_url
+    >>> model.save('my-catalog', store=from_url('file:///path/to/output'))
 
     Load it back:
 

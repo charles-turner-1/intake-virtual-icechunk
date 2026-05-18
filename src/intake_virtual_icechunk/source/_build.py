@@ -74,51 +74,56 @@ class IcechunkStoreBuilder:
     """Build a virtual Icechunk store from an existing intake-esm datastore.
 
     Given a pre-built intake-esm catalog, this builder iterates over every
-    dataset group in the catalog, opens the constituent files with VirtualiZarr to create virtual references, and writes each dataset as a named Zarr
-    *group* inside a single Icechunk store.  The result is one Icechunk store
-    with one group per dataset, mirroring the logical structure of the
+    dataset group in the catalog, opens the constituent files with VirtualiZarr
+    to create virtual references, and writes each dataset as a named Zarr
+    *group* inside a single Icechunk store. The result is one Icechunk store
+    with one group per dataset, mirroring the logical grouping defined by the
     intake-esm catalog.
 
     Each group's ``.zattrs`` is populated with the ``groupby_attrs`` values for
     that dataset, so that :class:`~intake_virtual_icechunk.core.IcechunkCatalog`
     can discover, list, and search entries without reading any data arrays.
 
-    After the store is built, a lightweight JSON sidecar is written alongside
-    the store so the catalog can be re-opened with
+    After the store is built, a lightweight JSON sidecar is written into the
+    store directory so the catalog can be re-opened from the store path or with
     :meth:`~intake_virtual_icechunk.core.IcechunkCatalog.from_json`.
 
     Icechunk session, store, and branch management is handled internally so
-    callers need only supply paths.
+    callers only need to supply the intake-esm catalog path and target Icechunk
+    store path.
 
-    Warning: store_options are for the source data store, not the target Icechunk store.
-    The target Icechunk store is always created with default options.
-    If you need to customize the target store (e.g. for a non-file-based storage backend),
-    please open an issue or submit a PR.
+    ``icechunk_storage_options`` configures the target Icechunk store.
+    ``icechunk_store_options`` configures access to the source data referenced
+    by the intake-esm catalog and is also filtered before being serialised into
+    the virtual chunk container sidecar metadata.
 
     Parameters
     ----------
-    catalog_path : Path : str
-        Path to an existing intake-esm catalog JSON file. Stored internally as a string.
-    store_path : str
-        Path or URI at which to create (or open) the Icechunk store.
-        Supported schemes: local path, ``s3://``, ``gs://`` / ``gcs://``,
-        ``az://``.
+    esm_datastore_path : Path or str
+        Path to an existing intake-esm catalog JSON file. Stored internally as
+        a string.
+    icechunk_store_path : Path or str
+        Path or URI at which to create the Icechunk store. Supported schemes:
+        local path, ``s3://``, ``gs://`` / ``gcs://``, ``az://``.
+    esm_datastore_kwargs : dict, optional
+        Keyword arguments forwarded to ``intake.open_esm_datastore``.
     parser : VirtualizarrParser, optional
-        Optionally specify the VirtualiZarr parser to use when opening source. I
-        not provided, the builder will attempt to infer the parser from the intake-esm
-        catalog's ``assets.format`` field. See https://intake-esm.readthedocs.io/en/stable/reference/esm-catalog-spec
-    storage_options : dict, optional
-        Keyword arguments forwarded to the Icechunk storage backend. See _resolve_storage() for details.
-    store_options: dict, optional
-
-    drop_cols: list[str], optional
-        List of column names in the intake-esm catalog's assets dataframe to ignore when attaching metadata.
-        the `path` column is always ignored - drop cols allows you to remove other metadata columns that
-        might no longer make sense, post virtualisation.
-    cols_to_deiter: list[str], optional
-        Intake-ESM supports columns with iterable values, which it represents as lists. Some of these will no
-        longer make sense to keep as lists post virtualisation. This argument allows you to specify columns to
-        transform from iterabls to scalars by taking the first value in each row, post deduplication.
+        VirtualiZarr parser class to use when opening source assets. If not
+        provided, the builder infers a parser from the intake-esm catalog's
+        ``assets.format`` field.
+    icechunk_storage_options : dict, optional
+        Keyword arguments forwarded to the Icechunk storage backend for the
+        target store. See :func:`intake_virtual_icechunk.utils._resolve_storage`.
+    icechunk_store_options : dict, optional
+        Keyword arguments used when opening the source data object store and
+        reconstructing the virtual chunk container. Credential-like options are
+        not written into the JSON sidecar.
+    drop_cols : list[str], optional
+        Column names in the intake-esm catalog's assets dataframe to omit from
+        attached Zarr group metadata. The asset path column is always omitted.
+    cols_to_deiter : list[str], optional
+        Columns whose deduplicated iterable metadata should be stored as a
+        scalar by taking the first value.
     """
 
     def __init__(
@@ -148,7 +153,7 @@ class IcechunkStoreBuilder:
         self.parser = parser()
 
     def __repr__(self) -> str:
-        """Repr, multiline formatted"""
+        """Return a multiline representation showing the builder configuration."""
         return (
             "IcechunkStoreBuilder("
             f"\n\tesm_datastore_path='{self.esm_datastore_path}', "
@@ -163,11 +168,7 @@ class IcechunkStoreBuilder:
 
     @property
     def esm_ds(self) -> esm_datastore:
-        """
-        Use a property to lazily load the intake-esm datastore only when needed,
-        and cache it on the builder instance. mostly so we can put all our optional
-        arguments in `__init__` together and not have to worry about ordering.
-        """
+        """Lazily open and cache the intake-esm datastore."""
 
         if self._esm_ds is None:
             self._esm_ds = intake.open_esm_datastore(
@@ -177,11 +178,10 @@ class IcechunkStoreBuilder:
 
     def _infer_parser(self) -> VirtualizarrParser:
         """
-        We can infer the parser from the esm datastore, since it's specification
-        contains it. We use this to determinte the parser.
+        Infer the VirtualiZarr parser class from the intake-esm assets format.
 
-        Warning: Calling this function *does not* set the builder's parser attribute.
-        It also returns a type, not an instance.
+        Calling this method does not set ``self.parser``. It returns a parser
+        class, not an instance.
         """
         from virtualizarr import parsers
 
@@ -191,7 +191,7 @@ class IcechunkStoreBuilder:
             raise ParserInferenceError(
                 "Cannot infer parser from intake-esm catalog: "
                 "the 'format' field in the catalog's 'assets' specification is missing. "
-                "Only asserts with a specified 'format' can be built into an Icechunk store. "
+                "Only assets with a specified 'format' can be built into an Icechunk store. "
                 "See https://intake-esm.readthedocs.io/en/stable/reference/esm-catalog-spec.html#assets-object"
             )
 
@@ -199,7 +199,7 @@ class IcechunkStoreBuilder:
             raise ParserInferenceError(
                 "Cannot infer parser from intake-esm catalog: "
                 "the 'format' field in the catalog's 'assets' specification is missing."
-                "Only asserts with a specified 'format' can be built into an Icechunk store."
+                "Only assets with a specified 'format' can be built into an Icechunk store."
                 "See https://intake-esm.readthedocs.io/en/stable/reference/esm-catalog-spec.html#assets-object"
             )
 
@@ -226,11 +226,10 @@ class IcechunkStoreBuilder:
 
     def _create_registry(self) -> ObjectStoreRegistry:
         """
-        Create an ObjectStoreRegistry to keep our source files in during the virtuualization
-        process. We should be able to infer this from the esm_datastore's assets and our
-        `_resolve_storage()` functionlity, determining a root & registry type.
+        Create and cache the ObjectStoreRegistry used to read source assets.
 
-        We also cache the registry on the builder instance.
+        The registry and source URL prefix are inferred from the intake-esm
+        assets column and ``self.store_options``.
         """
         path_column = self.esm_ds.esmcat.assets.column_name
         paths = self.esm_ds.esmcat.df[path_column].tolist()
@@ -324,8 +323,6 @@ class IcechunkStoreBuilder:
                 for attr in groupby_attrs:
                     if attr in group_df.columns:
                         group_attrs[attr] = group_df[attr].iloc[0]
-                # ^ Still necessary?
-
                 # Collect asset file paths for this group
                 file_paths: list[str] = group_df[assets_col].tolist()
                 try:
@@ -405,12 +402,12 @@ class IcechunkStoreBuilder:
         group_attrs: dict,
     ) -> None:
         """
-        Attach relevant metadata from the intake-esm catalog to the zarr group as attributes.
-        This is important for the catalog to be able to search and filter groups without
-        having to open the arrays.
+        Attach searchable intake-esm metadata to a Zarr group.
 
-        For now, we'll just attach the groupby_attrs, but we could also consider attaching
-        other metadata from the catalog if needed.
+        Metadata is deduplicated per group, optional columns are dropped, and
+        configured iterable columns are collapsed to scalars. Values from the
+        exploded catalog metadata take precedence over ``group_attrs`` so richer
+        per-asset metadata is preserved where both sources provide a value.
         """
 
         group_df = group_df.drop(columns=self.drop_cols, errors="ignore")
@@ -433,7 +430,6 @@ class IcechunkStoreBuilder:
             except IndexError:
                 exploded_metadata[col] = None
 
-        # And remove any cols we want to drop
         exploded_metadata = {
             k: v for k, v in exploded_metadata.items() if k not in self.drop_cols
         }
