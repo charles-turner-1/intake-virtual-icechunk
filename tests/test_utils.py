@@ -2,7 +2,9 @@ import pytest
 
 from intake_virtual_icechunk.utils import (
     ObjectStoreError,
+    _filter_config_args,
     _intake_cat_filename,
+    _path_to_url,
     _resolve_vcc_store,
     _sidecar_url,
 )
@@ -41,9 +43,9 @@ class TestSidecarUrl:
     def test_file_uri(self):
         # Regression: Path() on POSIX collapses file:///path → file:/path
         result = _sidecar_url("file:///tmp/demo.icechunk")
-        assert (
-            result == "file:///tmp/demo.icechunk/_intake_demo.json"
-        ), f"file:// URI mangled: got {result!r}"
+        assert result == "file:///tmp/demo.icechunk/_intake_demo.json", (
+            f"file:// URI mangled: got {result!r}"
+        )
 
     def test_file_uri_trailing_slash(self):
         result = _sidecar_url("file:///tmp/demo.icechunk/")
@@ -110,3 +112,61 @@ class TestResolveVccStore:
     def test_unknown_scheme_raises(self):
         with pytest.raises(ObjectStoreError, match="Unsupported URL prefix scheme"):
             _resolve_vcc_store("ftp://some-server/path/", {})
+
+
+class TestPathToUrl:
+    def test_bare_absolute_path_gets_file_scheme(self, tmp_path):
+        result = _path_to_url(str(tmp_path))
+        assert result == f"file://{tmp_path}"
+
+    def test_file_scheme_returned_unchanged(self):
+        url = "file:///tmp/my-store.icechunk"
+        assert _path_to_url(url) == url
+
+    def test_s3_scheme_returned_unchanged(self):
+        url = "s3://my-bucket/prefix/store.icechunk"
+        assert _path_to_url(url) == url
+
+    def test_relative_path_is_made_absolute(self):
+        """
+        Bit hard to assert what the path will become here as it depends on the test
+        runner's CWD, but we can at least check that it gets an absolute path and
+        the file scheme.
+        """
+        import os
+
+        result = _path_to_url("relative/path")
+        assert result.startswith("file://")
+        assert os.path.isabs(result[len("file://") :])
+
+
+class TestFilterConfigArgs:
+    def test_empty_dict_returns_empty(self):
+        assert _filter_config_args({}) == {}
+
+    def test_endpoint_url_renamed_to_endpoint(self):
+        result = _filter_config_args({"endpoint_url": "https://example.com"})
+        assert result == {"endpoint": "https://example.com"}
+        assert "endpoint_url" not in result
+
+    def test_anonymous_renamed_to_skip_signature(self):
+        result = _filter_config_args({"anonymous": True})
+        assert result == {"skip_signature": True}
+        assert "anonymous" not in result
+
+    def test_anonymous_false_renamed(self):
+        result = _filter_config_args({"anonymous": False})
+        assert result == {"skip_signature": False}
+
+    def test_anonymous_absent_skip_signature_not_injected(self):
+        # When anonymous is not set, skip_signature must not be added
+        result = _filter_config_args({"region": "us-east-1"})
+        assert "skip_signature" not in result
+
+    def test_icechunk_specific_keys_dropped(self):
+        opts = {"s3_compatible": True, "force_path_style": True, "from_env": True}
+        assert _filter_config_args(opts) == {}
+
+    def test_passthrough_keys_preserved(self):
+        result = _filter_config_args({"region": "ap-southeast-2", "allow_http": False})
+        assert result == {"region": "ap-southeast-2", "allow_http": False}

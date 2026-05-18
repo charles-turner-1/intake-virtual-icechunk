@@ -128,6 +128,37 @@ class TestVirtualIcechunkCatalogModel:
         )
         assert model.version == "1.0.0"
 
+    def test_load_cloud_url_splits_path_correctly(self):
+        """Regression: load() else-branch (cat.py:88) must split a cloud URL into
+        directory and filename before creating the obstore."""
+        import json
+        from unittest.mock import MagicMock, patch
+
+        sidecar = {
+            "store": "s3://bucket/store.icechunk",
+            "virtual_chunk_model": {
+                "url_prefix": "s3://bucket/data/",
+                "store_type": "PyObjectStoreConfig_S3",
+                "open_kwargs": {},
+            },
+        }
+        mock_get_result = MagicMock()
+        mock_get_result.bytes.return_value = json.dumps(sidecar).encode()
+
+        with (
+            patch("intake_virtual_icechunk.cat._obs_from_url") as mock_from_url,
+            patch(
+                "intake_virtual_icechunk.cat.obstore.get", return_value=mock_get_result
+            ) as mock_get,
+        ):
+            model = VirtualIcechunkCatalogModel.load("s3://bucket/path/to/catalog.json")
+
+        # Directory and filename must be split at the last '/'
+        mock_from_url.assert_called_once()
+        assert mock_from_url.call_args[0][0] == "s3://bucket/path/to"
+        mock_get.assert_called_once_with(mock_from_url.return_value, "catalog.json")
+        assert model.store == "s3://bucket/store.icechunk"
+
 
 class TestIcechunkCatalogFromJson:
     """
