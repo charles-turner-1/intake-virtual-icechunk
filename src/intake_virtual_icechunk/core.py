@@ -491,6 +491,7 @@ class IcechunkCatalog(Catalog):
         :class:`~intake_virtual_icechunk._build.IcechunkStoreBuilder`.
         """
         records = []
+
         for key in self.keys():
             _df = IcechunkDataSource(
                 key=key,
@@ -501,10 +502,10 @@ class IcechunkCatalog(Catalog):
             ).to_xarray()
             row: dict = {"key": key}
             row.update(
-                {"variables": tuple(_df.data_vars) or None}
+                {"variable": tuple(_df.data_vars) or None}
             )  # grid files might be none - better that than an empty list which is more likely to cause confusion
-            row.update({"coordinates": tuple(_df.coords)})
-            row.update({"dimensions": tuple(_df.dims)})
+            row.update({"coordinate": tuple(_df.coords)})
+            row.update({"dimension": tuple(_df.dims)})
 
             keys = [k.lower() for k in row.keys()]
             attrs = {
