@@ -25,6 +25,7 @@ from intake_virtual_icechunk.utils import (
     _intake_cat_filename,
     _path_to_url,
     _resolve_storage,
+    _resolve_vcc_credentials,
 )
 
 if sys.version_info >= (3, 13):
@@ -102,6 +103,11 @@ class IcechunkCatalog(Catalog):
     storage_options : dict, optional
         Credential/config keyword arguments forwarded to the Icechunk storage
         backend (e.g. ``{'from_env': True}`` for S3).
+    virtual_chunk_credentials_options : dict, optional
+        Credential kwargs used only for authorising access to the virtual
+        chunk container. This is kept separate from ``storage_options`` so the
+        Icechunk repo store and the source-data container can use different
+        auth settings.
     xarray_kwargs : dict, optional
         Keyword arguments forwarded to ``xarray.open_zarr()``.
     intake_kwargs : dict, optional
@@ -132,6 +138,7 @@ class IcechunkCatalog(Catalog):
         *,
         storage_options=None,
         sidecar_options=None,
+        virtual_chunk_credentials_options=None,
         xarray_kwargs=None,
         virtual_chunk_model=None,
         catalog_id=None,
@@ -142,6 +149,9 @@ class IcechunkCatalog(Catalog):
         # a str, and convert back to a Path if and when where needed.
         # TBC if this is a good idea.
         self.store: str = str(store)
+        self.virtual_chunk_credentials_options = (
+            virtual_chunk_credentials_options or {}
+        )
 
         if virtual_chunk_model is None:
             metadata = _read_sidecar_metadata(
@@ -193,8 +203,9 @@ class IcechunkCatalog(Catalog):
 
             storage = _resolve_storage(self.store, self.storage_options)
 
-            credentials = icechunk.containers_credentials(
-                {self.virtual_chunk_model.url_prefix: None}
+            credentials = _resolve_vcc_credentials(
+                self.virtual_chunk_model.url_prefix,
+                self.virtual_chunk_credentials_options,
             )
 
             self._open_repo = icechunk.Repository.open(
@@ -229,6 +240,7 @@ class IcechunkCatalog(Catalog):
         cat = cls(
             store=parent.store,
             storage_options=parent.storage_options,
+            virtual_chunk_credentials_options=parent.virtual_chunk_credentials_options,
             xarray_kwargs=parent.xarray_kwargs,
             virtual_chunk_model=parent.virtual_chunk_model.to_dict(),
         )
@@ -249,6 +261,7 @@ class IcechunkCatalog(Catalog):
         *,
         xarray_kwargs: dict | None = None,
         storage_options: dict | None = None,
+        virtual_chunk_credentials_options: dict | None = None,
     ) -> IcechunkCatalog:
         """
         Load an :class:`IcechunkCatalog` from a JSON sidecar file.
@@ -263,6 +276,9 @@ class IcechunkCatalog(Catalog):
         storage_options : dict, optional
             obstore config kwargs for *reading the JSON file itself* (not for
             the Icechunk store — those are embedded in the JSON).
+        virtual_chunk_credentials_options : dict, optional
+            Credential kwargs used only when authorising access to virtual
+            chunks referenced by the Icechunk store.
         """
         from .cat import VirtualIcechunkCatalogModel
 
@@ -272,6 +288,7 @@ class IcechunkCatalog(Catalog):
         return cls(
             store=model.store,
             storage_options=model.storage_options,
+            virtual_chunk_credentials_options=virtual_chunk_credentials_options,
             xarray_kwargs=xarray_kwargs or {},
             virtual_chunk_model=model.virtual_chunk_model.to_dict(),
             catalog_id=model.id or None,

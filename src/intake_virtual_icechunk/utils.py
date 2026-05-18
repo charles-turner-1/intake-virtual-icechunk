@@ -295,6 +295,49 @@ def _resolve_vcc_store(url_prefix: str, store_options: dict) -> Any:
     )
 
 
+def _resolve_vcc_credentials(url_prefix: str, credential_options: dict | None) -> dict:
+    """
+    Build the ``authorize_virtual_chunk_access`` mapping for an Icechunk repo.
+
+    Parameters
+    ----------
+    url_prefix : str
+        The virtual chunk container URL prefix.
+    credential_options : dict, optional
+        Credential kwargs passed to the appropriate ``icechunk.*_credentials``
+        helper for the container scheme.  Leave as ``None`` or ``{}`` to retain
+        the current default behaviour.
+
+    Returns
+    -------
+    dict
+        A mapping suitable for ``icechunk.containers_credentials``.
+    """
+
+    parsed = urlparse(url_prefix)
+    scheme = parsed.scheme
+
+    if not credential_options:
+        return icechunk.containers_credentials({url_prefix: None})
+
+    if scheme in ("", "file") or (len(scheme) == 1 and scheme.isalpha()):
+        return icechunk.containers_credentials({url_prefix: None})
+
+    if scheme == "s3":
+        credentials = icechunk.s3_credentials(**credential_options)
+    elif scheme in ("gs", "gcs"):
+        credentials = icechunk.gcs_credentials(**credential_options)
+    elif scheme in ("az", "abfs"):
+        credentials = icechunk.azure_credentials(**credential_options)
+    else:
+        raise ObjectStoreError(
+            f"Unsupported URL prefix scheme for credentials: {scheme!r}. "
+            "Expected a local path or one of s3://, gs://, gcs://, az://."
+        )
+
+    return icechunk.containers_credentials({url_prefix: credentials})
+
+
 def _path_to_url(path: str | Path) -> str:
     """
     Ensure a path has a URL scheme, converting bare local paths to ``file://`` URLs.

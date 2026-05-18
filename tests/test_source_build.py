@@ -331,6 +331,7 @@ class TestIcechunkStoreBuilder:
             parser=virtualizarr.parsers.HDFParser,
             icechunk_storage_options={"key": "value"},
             icechunk_store_options={"opt": 1},
+            virtual_chunk_credentials_options={"anonymous": True},
             drop_cols=["path"],
             cols_to_deiter=["variable"],
         )
@@ -339,9 +340,109 @@ class TestIcechunkStoreBuilder:
 
         assert "storage_options={'key': 'value'}" in result
         assert "store_options={'opt': 1}" in result
+        assert "virtual_chunk_credentials_options={'anonymous': True}" in result
         assert "drop_cols=['path']" in result
         assert "cols_to_deiter=['variable']" in result
         assert "parser=HDFParser" in result
+
+    def test_build_uses_separate_virtual_chunk_credentials(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            icechunk_store_path=dummy_store_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+            virtual_chunk_credentials_options={"anonymous": True},
+        )
+        dummy_store_path.mkdir()
+
+        fake_esm = builder.esm_ds
+        builder._esm_ds = fake_esm
+
+        class DummyTxn:
+            def __enter__(self):
+                return "STORE"
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        class DummyRepo:
+            def save_config(self):
+                return None
+
+            def transaction(self, *args, **kwargs):
+                return DummyTxn()
+
+        class DummyConfig:
+            def set_virtual_chunk_container(self, cont):
+                self.cont = cont
+
+        class DummyVCC:
+            def __init__(self):
+                self.url_prefix = "s3://bucket/prefix/"
+                self.store = object()
+
+        class DummyVZ:
+            def to_icechunk(self, store, group):
+                assert store == "STORE"
+
+        class DummyDataset:
+            vz = DummyVZ()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+        with (
+            patch.object(builder, "_attach_catalog_metadata", return_value=None),
+            patch(
+                "intake_virtual_icechunk.source._build._resolve_store",
+                return_value=("REGISTRY", "s3://bucket/prefix/"),
+            ),
+            patch(
+                "intake_virtual_icechunk.source._build._resolve_storage",
+                return_value="ICECHUNK_STORAGE",
+            ),
+            patch(
+                "intake_virtual_icechunk.source._build._resolve_vcc_store",
+                return_value="VCC_STORE",
+            ),
+            patch(
+                "intake_virtual_icechunk.source._build.icechunk.VirtualChunkContainer",
+                return_value=DummyVCC(),
+            ),
+            patch(
+                "intake_virtual_icechunk.source._build.icechunk.RepositoryConfig.default",
+                return_value=DummyConfig(),
+            ),
+            patch(
+                "intake_virtual_icechunk.source._build._resolve_vcc_credentials",
+                return_value={"s3://bucket/prefix/": "CREDS"},
+            ) as mock_creds,
+            patch(
+                "intake_virtual_icechunk.source._build.icechunk.Repository.create",
+                return_value=DummyRepo(),
+            ) as mock_repo_create,
+            patch(
+                "intake_virtual_icechunk.source._build.open_virtual_mfdataset",
+                return_value=DummyDataset(),
+            ),
+            patch("intake_virtual_icechunk.source._build.zarr.open_group"),
+            patch(
+                "intake_virtual_icechunk.cat.VirtualIcechunkCatalogModel.save",
+                return_value=None,
+            ),
+        ):
+            builder.build()
+
+        mock_creds.assert_called_once_with(
+            builder.source_url_prefix,
+            {"anonymous": True},
+        )
+        mock_repo_create.assert_called_once()
 
     def test_repr_parser_name_matches_instance(
         self, local_om2_datastore_path, intake_esm_kwargs, tmpdir

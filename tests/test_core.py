@@ -313,6 +313,14 @@ class TestIcechunkCatalogConstructorKwargs:
         cat = IcechunkCatalog(store=icechunk_store_path, xarray_kwargs=xr_kw)
         assert cat.storage_options != xr_kw
 
+    def test_virtual_chunk_credentials_kwarg_is_assigned(self, icechunk_store_path):
+        creds = {"anonymous": True}
+        cat = IcechunkCatalog(
+            store=icechunk_store_path,
+            virtual_chunk_credentials_options=creds,
+        )
+        assert cat.virtual_chunk_credentials_options == creds
+
     def test_defaults_fall_back_to_metadata(self, icechunk_store_path):
         """When no kwargs are provided, values come from the JSON metadata."""
         cat_default = IcechunkCatalog(store=icechunk_store_path)
@@ -327,6 +335,51 @@ class TestIcechunkCatalogConstructorKwargs:
         assert (
             cat_default.virtual_chunk_model.url_prefix
             == cat_explicit_none.virtual_chunk_model.url_prefix
+        )
+
+
+class TestVirtualChunkCredentialSeparation:
+    def test_from_parent_preserves_virtual_chunk_credentials(self, icechunk_store_path):
+        parent = IcechunkCatalog(
+            store=icechunk_store_path,
+            virtual_chunk_credentials_options={"anonymous": True},
+        )
+
+        child = IcechunkCatalog._from_parent(parent, allowed_keys=[])
+
+        assert child.virtual_chunk_credentials_options == {"anonymous": True}
+
+    def test_repo_open_uses_separate_virtual_chunk_credentials(self, icechunk_store_path):
+        from unittest.mock import MagicMock, patch
+
+        repo = MagicMock()
+
+        with (
+            patch(
+                "intake_virtual_icechunk.core._resolve_storage",
+                return_value="STORAGE",
+            ) as mock_storage,
+            patch(
+                "intake_virtual_icechunk.core._resolve_vcc_credentials",
+                return_value={"s3://bucket/": "CREDS"},
+            ) as mock_vcc_creds,
+            patch("icechunk.Repository.open", return_value=repo) as mock_open,
+        ):
+            cat = IcechunkCatalog(
+                store=icechunk_store_path,
+                storage_options={"from_env": True},
+                virtual_chunk_credentials_options={"anonymous": True},
+            )
+            assert cat._repo is repo
+
+        mock_storage.assert_called_once_with(str(icechunk_store_path), {"from_env": True})
+        mock_vcc_creds.assert_called_once_with(
+            cat.virtual_chunk_model.url_prefix,
+            {"anonymous": True},
+        )
+        mock_open.assert_called_once_with(
+            "STORAGE",
+            authorize_virtual_chunk_access={"s3://bucket/": "CREDS"},
         )
 
     def test_all_three_kwargs_independent(self, icechunk_store_path):

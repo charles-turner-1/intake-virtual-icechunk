@@ -25,6 +25,7 @@ from intake_virtual_icechunk.utils import (
     _path_to_url,
     _resolve_storage,
     _resolve_store,
+    _resolve_vcc_credentials,
     _resolve_vcc_store,
 )
 
@@ -110,6 +111,11 @@ class IcechunkStoreBuilder:
     storage_options : dict, optional
         Keyword arguments forwarded to the Icechunk storage backend. See _resolve_storage() for details.
     store_options: dict, optional
+        Non-secret config kwargs for the virtual chunk container backend.
+    virtual_chunk_credentials_options : dict, optional
+        Credential kwargs used only when authorising access to the virtual
+        chunk container. This is kept separate from ``storage_options`` so the
+        repo store and source-data container can use different auth settings.
 
     drop_cols: list[str], optional
         List of column names in the intake-esm catalog's assets dataframe to ignore when attaching metadata.
@@ -130,6 +136,7 @@ class IcechunkStoreBuilder:
         parser: VirtualizarrParser | None = None,
         icechunk_storage_options: dict | None = None,
         icechunk_store_options: dict | None = None,
+        virtual_chunk_credentials_options: dict | None = None,
         drop_cols: list[str] | None = None,
         cols_to_deiter: list[str] | None = None,
     ):
@@ -141,6 +148,9 @@ class IcechunkStoreBuilder:
 
         self.storage_options = icechunk_storage_options or {}
         self.store_options = icechunk_store_options or {}
+        self.virtual_chunk_credentials_options = (
+            virtual_chunk_credentials_options or {}
+        )
         self.drop_cols = drop_cols or []
         self.cols_to_deiter = cols_to_deiter or []
 
@@ -156,6 +166,7 @@ class IcechunkStoreBuilder:
             f"\n\tparser={self.parser.__class__.__name__}, "
             f"\n\tstorage_options={self.storage_options}, "
             f"\n\tstore_options={self.store_options}, "
+            f"\n\tvirtual_chunk_credentials_options={self.virtual_chunk_credentials_options}, "
             f"\n\tdrop_cols={self.drop_cols}, "
             f"\n\tcols_to_deiter={self.cols_to_deiter}"
             "\n)"
@@ -294,7 +305,10 @@ class IcechunkStoreBuilder:
         config = icechunk.RepositoryConfig.default()
         config.set_virtual_chunk_container(self.vc_container)
 
-        credentials = icechunk.containers_credentials({self.source_url_prefix: None})
+        credentials = _resolve_vcc_credentials(
+            self.source_url_prefix,
+            self.virtual_chunk_credentials_options,
+        )
         repo = icechunk.Repository.create(storage, config, credentials)
 
         # Persist the configuration so we don't need to figure it out when we come

@@ -6,6 +6,7 @@ from intake_virtual_icechunk.utils import (
     _intake_cat_filename,
     _path_to_url,
     _resolve_store,
+    _resolve_vcc_credentials,
     _resolve_vcc_store,
     _sidecar_url,
 )
@@ -113,6 +114,47 @@ class TestResolveVccStore:
     def test_unknown_scheme_raises(self):
         with pytest.raises(ObjectStoreError, match="Unsupported URL prefix scheme"):
             _resolve_vcc_store("ftp://some-server/path/", {})
+
+
+class TestResolveVccCredentials:
+    def test_empty_options_fall_back_to_none_credentials(self):
+        from unittest.mock import patch
+
+        with patch(
+            "intake_virtual_icechunk.utils.icechunk.containers_credentials",
+            return_value={"s3://bucket/": None},
+        ) as mock_containers:
+            result = _resolve_vcc_credentials("s3://bucket/", None)
+
+        assert result == {"s3://bucket/": None}
+        mock_containers.assert_called_once_with({"s3://bucket/": None})
+
+    def test_s3_options_use_s3_credentials(self):
+        from unittest.mock import patch
+
+        with (
+            patch(
+                "intake_virtual_icechunk.utils.icechunk.s3_credentials",
+                return_value="S3CREDS",
+            ) as mock_s3,
+            patch(
+                "intake_virtual_icechunk.utils.icechunk.containers_credentials",
+                return_value={"s3://bucket/": "wrapped"},
+            ) as mock_containers,
+        ):
+            result = _resolve_vcc_credentials(
+                "s3://bucket/", {"anonymous": True, "from_env": False}
+            )
+
+        assert result == {"s3://bucket/": "wrapped"}
+        mock_s3.assert_called_once_with(anonymous=True, from_env=False)
+        mock_containers.assert_called_once_with({"s3://bucket/": "S3CREDS"})
+
+    def test_unknown_scheme_raises(self):
+        with pytest.raises(
+            ObjectStoreError, match="Unsupported URL prefix scheme for credentials"
+        ):
+            _resolve_vcc_credentials("ftp://some-server/path/", {"from_env": True})
 
 
 class TestPathToUrl:
