@@ -95,7 +95,10 @@ class TestVirtualIcechunkCatalogModel:
         # Turn the path into a string for easier comparison in the JSON output
         icechunk_store_path = str(icechunk_store_path)
 
-        model.save("my-catalog", directory=str(tmp_path))
+        from obstore.store import from_url as _obs_from_url
+
+        obs_store = _obs_from_url(f"file://{tmp_path}")
+        model.save("my-catalog", store=obs_store)
         json_path = tmp_path / "my-catalog.json"
         assert json_path.exists()
 
@@ -124,6 +127,37 @@ class TestVirtualIcechunkCatalogModel:
             store=str(icechunk_store_path), virtual_chunk_model=virtual_chunk_container
         )
         assert model.version == "1.0.0"
+
+    def test_load_cloud_url_splits_path_correctly(self):
+        """Regression: load() else-branch (cat.py:88) must split a cloud URL into
+        directory and filename before creating the obstore."""
+        import json
+        from unittest.mock import MagicMock, patch
+
+        sidecar = {
+            "store": "s3://bucket/store.icechunk",
+            "virtual_chunk_model": {
+                "url_prefix": "s3://bucket/data/",
+                "store_type": "PyObjectStoreConfig_S3",
+                "open_kwargs": {},
+            },
+        }
+        mock_get_result = MagicMock()
+        mock_get_result.bytes.return_value = json.dumps(sidecar).encode()
+
+        with (
+            patch("intake_virtual_icechunk.cat._obs_from_url") as mock_from_url,
+            patch(
+                "intake_virtual_icechunk.cat.obstore.get", return_value=mock_get_result
+            ) as mock_get,
+        ):
+            model = VirtualIcechunkCatalogModel.load("s3://bucket/path/to/catalog.json")
+
+        # Directory and filename must be split at the last '/'
+        mock_from_url.assert_called_once()
+        assert mock_from_url.call_args[0][0] == "s3://bucket/path/to"
+        mock_get.assert_called_once_with(mock_from_url.return_value, "catalog.json")
+        assert model.store == "s3://bucket/store.icechunk"
 
 
 class TestIcechunkCatalogFromJson:
@@ -192,7 +226,7 @@ class TestIcechunkCatalogFromJson:
 
         This exercises:
         - _sidecar_url correctly locates the sidecar (no file:// mangling)
-        - fsspec.open() can read it
+        - obstore.get() can read it
         - VirtualChunkContainerModel serialises / deserialises intact
         """
         # Open catalog and record the original VCC config
