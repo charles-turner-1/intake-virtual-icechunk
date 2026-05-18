@@ -259,8 +259,8 @@ class IcechunkCatalog(Catalog):
         xarray_kwargs : dict, optional
             Keyword arguments forwarded to ``xarray.open_zarr()``.
         storage_options : dict, optional
-            fsspec options for *reading the JSON file itself* (not for the
-            Icechunk store — those are embedded in the JSON).
+            obstore config kwargs for *reading the JSON file itself* (not for
+            the Icechunk store — those are embedded in the JSON).
         """
         from .cat import VirtualIcechunkCatalogModel
 
@@ -307,7 +307,9 @@ class IcechunkCatalog(Catalog):
             virtual_chunk_model=self.virtual_chunk_model,
         )
         dir_url = _path_to_url(directory or os.getcwd())
-        obs_store = _obs_from_url(dir_url, config=_filter_config_args(self.storage_options))
+        obs_store = _obs_from_url(
+            dir_url, config=_filter_config_args(self.storage_options)
+        )
         model.save(name, store=obs_store, json_dump_kwargs=json_dump_kwargs)
 
     # ------------------------------------------------------------------

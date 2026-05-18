@@ -325,7 +325,12 @@ def _filter_config_args(store_options: dict) -> dict:
 
     obstore_opts = copy.deepcopy(store_options)
 
-    icechunk_specific_keys = {"s3_compatible", "force_path_style", "anonymous", "from_env"}
+    icechunk_specific_keys = {
+        "s3_compatible",
+        "force_path_style",
+        "anonymous",
+        "from_env",
+    }
 
     if "endpoint_url" in obstore_opts:
         obstore_opts["endpoint"] = obstore_opts.pop("endpoint_url")

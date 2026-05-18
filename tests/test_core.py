@@ -96,6 +96,7 @@ class TestVirtualIcechunkCatalogModel:
         icechunk_store_path = str(icechunk_store_path)
 
         from obstore.store import from_url as _obs_from_url
+
         obs_store = _obs_from_url(f"file://{tmp_path}")
         model.save("my-catalog", store=obs_store)
         json_path = tmp_path / "my-catalog.json"
@@ -194,7 +195,7 @@ class TestIcechunkCatalogFromJson:
 
         This exercises:
         - _sidecar_url correctly locates the sidecar (no file:// mangling)
-        - fsspec.open() can read it
+        - obstore.get() can read it
         - VirtualChunkContainerModel serialises / deserialises intact
         """
         # Open catalog and record the original VCC config

@@ -12,8 +12,8 @@ from urllib.parse import urlparse
 
 import obstore
 import pydantic
-from pydantic import ConfigDict
 from obstore.store import from_url as _obs_from_url
+from pydantic import ConfigDict
 
 from intake_virtual_icechunk.source._containers import VirtualChunkContainerModel
 from intake_virtual_icechunk.utils import _filter_config_args, _path_to_url
@@ -86,7 +86,9 @@ class VirtualIcechunkCatalogModel(pydantic.BaseModel):
             filename = p.name
         else:
             directory_url, filename = json_file.rsplit("/", 1)
-        obs_store = _obs_from_url(directory_url, config=_filter_config_args(storage_options))
+        obs_store = _obs_from_url(
+            directory_url, config=_filter_config_args(storage_options)
+        )
         content = obstore.get(obs_store, filename).bytes()
         return cls.model_validate(json.loads(bytes(content)))
 
