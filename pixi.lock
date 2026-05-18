@@ -13243,6 +13243,7 @@ packages:
   - icechunk
   - intake-esm
   - zarr
+  - obstore
   - pytest ; extra == 'test'
   - pytest-cov ; extra == 'test'
   - myst-nb ; extra == 'docs'
