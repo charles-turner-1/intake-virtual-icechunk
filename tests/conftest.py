@@ -105,8 +105,10 @@ def icechunk_localstore_path(esm_datastore_path, tmp_path_factory) -> Path:
 
 @dataclass
 class CephStoreInfo:
-    bucket_url: str
-    icechunk_prefix: str
+    icecat_bucket_url: str
+    icecat_prefix: str
+    vcc_bucket_url: str
+    vcc_prefix: str
 
 
 @pytest.fixture(scope="session")
@@ -144,8 +146,10 @@ def icechunk_cephstore_info() -> Generator[CephStoreInfo, None, None]:
     icsb.build()
 
     yield CephStoreInfo(
-        bucket_url="s3://intake-virtual-icechunk-store/",
-        icechunk_prefix=f"icecat-{hash_suffix}",
+        icecat_bucket_url="s3://intake-virtual-icechunk-store/",
+        icecat_prefix=f"icecat-{hash_suffix}",
+        vcc_bucket_url=f"{icsb.source_url_prefix.split('/icecat-')[0]}",
+        vcc_prefix=icsb.source_url_prefix.split("/")[-1],
     )
 
     """

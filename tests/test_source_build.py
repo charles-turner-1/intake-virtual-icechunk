@@ -1,12 +1,19 @@
+import os
+import uuid
+from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import icechunk
 import intake
 import pytest
+import tlz
 import virtualizarr
 from access_nri_intake.source.builders import AccessOm2Builder
+from dotenv import load_dotenv
 from intake_esm import esm_datastore
+from obstore.store import ObjectStore, from_url
 from pandas.testing import assert_frame_equal
 
 from intake_virtual_icechunk.source import IcechunkStoreBuilder
@@ -36,7 +43,112 @@ def local_om2_datastore_path(sample_data, tmp_path_factory) -> Path:
     return catalog_path
 
 
-class TestIcechunkStoreBuilder:
+class BuilderTests:
+    """
+    Tests for the IcechunkStoreBuilder class, which is responsible for building
+    an IcechunkStore from a given intake-esm datastore.
+    """
+
+    def test_init_infer_parser(self, *args, **kwargs):
+        """
+        Initialisation without a parser should trigger parser inference, which
+        in turn should open the esm datastore
+        """
+        raise NotImplementedError("Base test, to be implemented by child classes")
+
+    def test_init_with_parser(self, *args, **kwargs):
+        """
+        Initialisation with a parser should use the provided parser not instantiate
+        the esm åtastore until it's asked for
+        """
+        raise NotImplementedError("Base test, to be implemented by child classes")
+
+    @pytest.mark.parametrize(
+        "format_val, parser",
+        [
+            ("netcdf", virtualizarr.parsers.HDFParser),
+            ("zarr", virtualizarr.parsers.ZarrParser),
+            ("zarr2", virtualizarr.parsers.ZarrParser),
+            ("zarr3", virtualizarr.parsers.ZarrParser),
+            ("reference", virtualizarr.parsers.KerchunkJSONParser),
+        ],
+    )
+    def test_infer_parser(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir, format_val, parser
+    ):
+        """
+        Mostly a regression test for now.
+        """
+        raise NotImplementedError("Base test, to be implemented by child classes")
+
+    def test_clean_build(self, *args, **kwargs):
+        """
+        Test that the build method creates an IcechunkStore with the expected
+        store type and storage options.
+        """
+        raise NotImplementedError("Base test, to be implemented by child classes")
+
+    def test_build_all_failures(self, *args, **kwargs):
+        """
+        Test that the build method creates an IcechunkStore with the expected
+        store type and storage options. To ensure we have some failures, we're
+        going to change the parser
+        """
+        raise NotImplementedError("Base test, to be implemented by child classes")
+
+    def test_build_not_concat_dim_issue(self, *args, **kwargs):
+        """
+        Test that the build method creates an IcechunkStore with the expected
+        store type and storage options. To ensure we have some failures, we're
+        going to change the parser to one that doesn't support concatenation along a dimension.
+        This should trigger a specific failure mode that we want to check is handled correctly.
+        """
+        raise NotImplementedError("Base test, to be implemented by child classes")
+
+    def test_build_concat_dim_issue(self, *args, **kwargs):
+        """
+        Test that the build method creates an IcechunkStore with the expected
+        store type and storage options. To ensure we have some failures, we're
+        going to change the parser to one that doesn't support concatenation along a dimension.
+        This should trigger a specific failure mode that we want to check is handled correctly.
+        """
+        raise NotImplementedError("Base test, to be implemented by child classes")
+
+    def test_build_deiters_cols_existing(self, *args, **kwargs):
+        """
+        Test that the build method correctly de-iterates columns specified in the cols_to_deiter argument.
+        This is a regression test for a specific issue we had where if the column to de-iterate had some null values, the de-iteration would fail.
+        """
+        raise NotImplementedError("Base test, to be implemented by child classes")
+
+    def test_repr_defaults(self, *args, **kwargs):
+        """
+        __repr__ should include all key fields with their default values when no
+        optional arguments are provided.
+        """
+        raise NotImplementedError("Base test, to be implemented by child classes")
+
+    def test_repr_with_custom_args(self, *args, **kwargs):
+        """
+        __repr__ should reflect non-default values for all optional arguments.
+        """
+        raise NotImplementedError("Base test, to be implemented by child classes")
+
+    def test_repr_parser_name_matches_instance(self, *args, **kwargs):
+        """
+        The parser name in __repr__ should match the class name of the instantiated parser.
+        """
+        raise NotImplementedError("Base test, to be implemented by child classes")
+
+    def test_build_deiters_cols_exceptionlogic(self, *args, **kwargs):
+        """
+        Test that the build method correctly de-iterates columns specified in the cols_to_deiter argument.
+        This is a regression test for a specific issue we had where if the column to de-iterate had some null values, the de-iteration would fail.
+        """
+        raise NotImplementedError("Base test, to be implemented by child classes")
+
+
+class TestIcechunkLocalStoreBuilder(BuilderTests):
     """
     Tests for the IcechunkStoreBuilder class, which is responsible for building
     an IcechunkStore from a given intake-esm datastore.
@@ -389,3 +501,202 @@ class TestIcechunkStoreBuilder:
             cat.df.loc["ocean.fx.xt_ocean:1.yt_ocean:1.point"].variable_standard_name
             is None
         )
+
+
+class TestIcechunkCephStoreBuilder(BuilderTests):
+    """
+    Tests for the IcechunkStoreBuilder class, which is responsible for building
+    an IcechunkStore from a given intake-esm datastore.
+    """
+
+    @pytest.fixture(scope="class")
+    def bucket_base_url(self) -> str:
+        return "s3://intake-virtual-icechunk-store"
+
+    @pytest.fixture
+    def icecat_store_tmp_url(self, bucket_base_url) -> Generator[str, None, None]:
+        """
+        Should not be used for anything that intends to write to the store.
+        as this is not a yield fixture so doesn't perform cleanup
+        """
+        hash_suffix = uuid.uuid4().hex
+        yield f"{bucket_base_url}/icecat-{hash_suffix}"
+
+        # Cleanup - delete all objects with the prefix we used for the test
+
+        # This might fail if we didnjt actually create the store? Only one way to
+        # find out I guess.
+
+        load_dotenv()
+
+        access_key = os.getenv("CEPH_ACCESS_KEY_ID")
+        secret_key = os.getenv("CEPH_SECRET_ACCESS_KEY")
+
+        s3_store: ObjectStore = from_url(
+            bucket_base_url,
+            config={
+                "endpoint_url": "https://projects.pawsey.org.au",
+                "access_key_id": access_key,
+                "secret_access_key": secret_key,
+            },
+        )
+
+        s3_store.delete(f"icecat-{hash_suffix}")
+
+    @pytest.fixture
+    def esm_datastore_kwargs(self) -> dict[str, Any]:
+        return {
+            "storage_options": {
+                "endpoint_url": "https://projects.pawsey.org.au",
+                "anon": True,
+            },
+            "columns_with_iterables": [
+                "variable",
+                "variable_long_name",
+                "variable_standard_name",
+                "variable_cell_methods",
+                "variable_units",
+            ],
+        }
+
+    @pytest.fixture
+    def icechunk_store_opts(self) -> dict[str, str | bool]:
+        return {
+            "endpoint_url": "https://projects.pawsey.org.au",
+            "s3_compatible": True,
+            "force_path_style": True,
+            "anonymous": True,
+        }
+
+    @pytest.fixture
+    def icechunk_storage_opts(self) -> dict[str, str | bool]:
+        return {
+            "endpoint_url": "https://projects.pawsey.org.au",
+            "force_path_style": True,
+            "anonymous": True,
+        }
+
+    @pytest.fixture(scope="class")
+    def esm_datastore_path(self) -> str:
+        return "s3://intake-virtual-icechunk-om2-esm-ds-container/access-om2.json"
+
+    def test_init_infer_parser(
+        self,
+        esm_datastore_kwargs,
+        esm_datastore_path,
+        icecat_store_tmp_url,
+        icechunk_storage_opts,
+    ):
+        """
+        Initialisation without a parser should trigger parser inference, which
+        in turn should open the esm datastore
+        """
+        builder = IcechunkStoreBuilder(
+            esm_datastore_path=esm_datastore_path,
+            icechunk_store_path=icecat_store_tmp_url,
+            esm_datastore_kwargs=esm_datastore_kwargs,
+            icechunk_storage_options=icechunk_storage_opts,
+        )
+
+        assert isinstance(builder.parser, virtualizarr.parsers.hdf.hdf.HDFParser)
+
+    def test_clean_build(
+        self,
+        esm_datastore_path,
+        esm_datastore_kwargs,
+        icecat_store_tmp_url,
+        icechunk_store_opts,
+        icechunk_storage_opts,
+    ):
+        builder = IcechunkStoreBuilder(
+            esm_datastore_path=esm_datastore_path,
+            esm_datastore_kwargs=esm_datastore_kwargs,
+            icechunk_store_path=icecat_store_tmp_url,
+            icechunk_store_options=icechunk_store_opts,
+            icechunk_storage_options=icechunk_storage_opts,
+        )
+
+        builder.build()
+
+        s3_store: ObjectStore = from_url(  # type: ignore[annotation-unchecked]
+            icecat_store_tmp_url,
+            config={
+                "endpoint_url": "https://projects.pawsey.org.au",
+                "skip_signature": True,
+            },
+        )
+
+        obj_list = list(tlz.concat(s3_store.list()))
+
+        fname = _intake_cat_filename(builder.store_path)
+
+        assert [i for i in obj_list if i["path"] == fname]  # Wrote the json file
+        assert (
+            len([i for i in obj_list if i["path"] == fname]) == 1
+        )  # Only wrote one json file
+        assert len(obj_list) > 1  # Wrote some chunks
+        assert builder.failed_list == []  # No failures
+
+    def test_build_all_failures(
+        self,
+        esm_datastore_path,
+        esm_datastore_kwargs,
+        icecat_store_tmp_url,
+        icechunk_store_opts,
+        icechunk_storage_opts,
+    ):
+        builder = IcechunkStoreBuilder(
+            esm_datastore_path=esm_datastore_path,
+            esm_datastore_kwargs=esm_datastore_kwargs,
+            icechunk_store_path=icecat_store_tmp_url,
+            icechunk_store_options=icechunk_store_opts,
+            icechunk_storage_options=icechunk_storage_opts,
+            parser=virtualizarr.parsers.ZarrParser,
+        )
+        with pytest.raises(
+            icechunk.IcechunkError,
+            match="cannot commit, no changes made to the session",
+        ):
+            builder.build()
+
+        # If the build failed, we should have a list of all the datasets that failed and why
+        assert len(builder.failed_list) == len(builder.esm_ds.keys())
+        assert set(fl[0] for fl in builder.failed_list) == set(builder.esm_ds.keys())
+
+    def test_build_not_concat_dim_issue(
+        self,
+        esm_datastore_path,
+        esm_datastore_kwargs,
+        icecat_store_tmp_url,
+        icechunk_store_opts,
+        icechunk_storage_opts,
+    ):
+        """
+        Test that the build method creates an IcechunkStore with the expected
+        store type and storage options. To ensure we have some failures, we're
+        going to change the parser to one that doesn't support concatenation along a dimension.
+        This should trigger a specific failure mode that we want to check is handled correctly.
+        """
+        builder = IcechunkStoreBuilder(
+            esm_datastore_path=esm_datastore_path,
+            esm_datastore_kwargs=esm_datastore_kwargs,
+            icechunk_store_path=icecat_store_tmp_url,
+            icechunk_store_options=icechunk_store_opts,
+            icechunk_storage_options=icechunk_storage_opts,
+        )
+
+        with pytest.raises(
+            icechunk.IcechunkError,
+            match="cannot commit, no changes made to the session",
+        ):
+            with patch(
+                "intake_virtual_icechunk.source._build.open_virtual_mfdataset",
+                side_effect=RuntimeError("Something stupid"),
+            ):
+                builder.build()
+
+        assert len(builder.failed_list) == len(builder.esm_ds.keys())
+        assert set(fl[0] for fl in builder.failed_list) == set(builder.esm_ds.keys())
+
+        with pytest.raises(RuntimeError, match="Something stupid"):
+            raise builder.failed_list[0][1]
