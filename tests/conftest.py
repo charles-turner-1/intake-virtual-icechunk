@@ -160,26 +160,32 @@ def icechunk_cephstore_info() -> Generator[CephStoreInfo, None, None]:
     # creds to do anything useful here. These will also be in the repo, and we'll have
     # a periodic cleanup job running on the bucket to make sure it doesn't get too
     # cluttered with old test stores.
-    import os
+    try:
+        import os
 
-    from dotenv import load_dotenv
-    from obstore.store import ObjectStore, from_url
+        from dotenv import load_dotenv
+        from obstore.store import ObjectStore, from_url
 
-    load_dotenv()
+        load_dotenv()
 
-    access_key = os.getenv("CEPH_ACCESS_KEY_ID")
-    secret_key = os.getenv("CEPH_SECRET_ACCESS_KEY")
+        access_key = os.getenv("CEPH_ACCESS_KEY_ID")
+        secret_key = os.getenv("CEPH_SECRET_ACCESS_KEY")
 
-    s3_store: ObjectStore = from_url(
-        "s3://intake-virtual-icechunk-store",
-        config={
-            "endpoint_url": "https://projects.pawsey.org.au",
-            "access_key_id": access_key,
-            "secret_access_key": secret_key,
-        },
-    )
+        s3_store: ObjectStore = from_url(
+            "s3://intake-virtual-icechunk-store",
+            config={
+                "endpoint_url": "https://projects.pawsey.org.au",
+                "access_key_id": access_key,
+                "secret_access_key": secret_key,
+            },
+        )
 
-    s3_store.delete(f"icecat-{hash_suffix}")
+        s3_store.delete(f"icecat-{hash_suffix}")
+    except Exception as e:
+        print(f"Error during teardown of Ceph store: {e}")
+        print(
+            f"Please manually delete the objects with prefix icecat-{hash_suffix} from the intake-virtual-icechunk-store bucket"
+        )
 
 
 @pytest.fixture

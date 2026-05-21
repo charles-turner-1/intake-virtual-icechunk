@@ -527,21 +527,26 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         # This might fail if we didnjt actually create the store? Only one way to
         # find out I guess.
 
-        load_dotenv()
+        try:
+            load_dotenv()
+            access_key = os.getenv("CEPH_ACCESS_KEY_ID")
+            secret_key = os.getenv("CEPH_SECRET_ACCESS_KEY")
 
-        access_key = os.getenv("CEPH_ACCESS_KEY_ID")
-        secret_key = os.getenv("CEPH_SECRET_ACCESS_KEY")
+            s3_store: ObjectStore = from_url(
+                bucket_base_url,
+                config={
+                    "endpoint_url": "https://projects.pawsey.org.au",
+                    "access_key_id": access_key,
+                    "secret_access_key": secret_key,
+                },
+            )
 
-        s3_store: ObjectStore = from_url(
-            bucket_base_url,
-            config={
-                "endpoint_url": "https://projects.pawsey.org.au",
-                "access_key_id": access_key,
-                "secret_access_key": secret_key,
-            },
-        )
-
-        s3_store.delete(f"icecat-{hash_suffix}")
+            s3_store.delete(f"icecat-{hash_suffix}")
+        except Exception as e:
+            print(f"Error during teardown of Ceph store: {e}")
+            print(
+                f"Please manually delete the objects with prefix icecat-{hash_suffix} from the intake-virtual-icechunk-store bucket"
+            )
 
     @pytest.fixture
     def esm_datastore_kwargs(self) -> dict[str, Any]:
