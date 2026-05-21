@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import icechunk
 import intake
+import numpy as np
 import pytest
 import tlz
 import virtualizarr
@@ -911,18 +912,21 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         assert len(cat.df) > 0
         assert len(cat.keys()) > 0
 
+        datasets_with_data_vars = 0
+
         for key in cat.keys():
             ds = cat[key].to_xarray()
             if not ds.data_vars:
                 continue
 
+            datasets_with_data_vars += 1
             var_name = next(iter(ds.data_vars))
             sample = ds[var_name].isel({dim: 0 for dim in ds[var_name].dims}).load()
 
+            assert isinstance(sample.values, np.ndarray)
             assert sample.size == 1
-            return
 
-        pytest.fail("Ceph-backed catalog opened, but no data variables were readable")
+        assert datasets_with_data_vars > 0
 
     def test_repr_defaults(
         self,
