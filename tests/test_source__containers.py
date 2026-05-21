@@ -166,39 +166,46 @@ class TestLocalFilesystemStore(StoreTests):
 
 
 class TestCephStore(StoreTests):
+    """
+    Note: Ceph stores apparently are S3 and not S3 compatible stores.
+    Not 100% sure why.
+    """
+
+    _CEPH_STORE_OPTIONS = {
+        "endpoint_url": "https://projects.pawsey.org.au",
+        "force_path_style": True,
+        "anonymous": True,
+        "region": None,
+    }
+
     @pytest.fixture(scope="class")
-    def canonical_vc_container(
-        self, icechunk_cephstore_info
-    ) -> icechunk.VirtualChunkContainer:
+    def vcc_url(self, icechunk_cephstore_info) -> str:
+        return icechunk_cephstore_info.vcc_bucket_url
+
+    @pytest.fixture(scope="class")
+    def canonical_vc_container(self, vcc_url) -> icechunk.VirtualChunkContainer:
         return icechunk.VirtualChunkContainer(
-            url_prefix=icechunk_cephstore_info.bucket_url,
+            url_prefix=vcc_url,
             store=icechunk.s3_store(
-                endpoint_url="https://projects.pawsey.org.au",
-                force_path_style=True,
-                anonymous=True,
-                region=None,
+                **self._CEPH_STORE_OPTIONS,
             ),
         )
 
-    def test_roundtrip(self, icechunk_cephstore_info):
+    def test_roundtrip(self, vcc_url):
         config = icechunk.RepositoryConfig.default()
 
         config.set_virtual_chunk_container(
             icechunk.VirtualChunkContainer(
-                url_prefix=icechunk_cephstore_info,
-                store=icechunk.s3_store(
-                    icechunk_cephstore_info,
-                    endpoint_url="https://projects.pawsey.org.au",
-                    force_path_style=True,
-                    anonymous=True,
-                ),
+                url_prefix=vcc_url,
+                store=icechunk.s3_store(**self._CEPH_STORE_OPTIONS),
             )
         )
 
-        vc_container = config.get_virtual_chunk_container(icechunk_cephstore_info)
+        vc_container = config.get_virtual_chunk_container(vcc_url)
 
         config_model = VirtualChunkContainerModel.from_virtual_chunk_container(
-            vc_container
+            vc_container,
+            store_options=self._CEPH_STORE_OPTIONS,
         )
 
         reconst_vc_container = config_model.to_virtual_chunk_container()
@@ -209,22 +216,60 @@ class TestCephStore(StoreTests):
 
         assert reconst_vc_container == vc_container
 
-    @pytest.mark.xfail(reason="Not implemented yet")
-    def test_from_virtual_chunk_container(self, *args, **kwargs):
-        return super().test_from_virtual_chunk_container(*args, **kwargs)
+    def test_from_virtual_chunk_container(self, canonical_vc_container):
+        config_model = VirtualChunkContainerModel.from_virtual_chunk_container(
+            canonical_vc_container
+        )
 
-    @pytest.mark.xfail(reason="Not implemented yet")
-    def test_to_virtual_chunk_container(self, *args, **kwargs):
-        return super().test_to_virtual_chunk_container(*args, **kwargs)
+        assert config_model.store_type == "PyObjectStoreConfig_S3"
+        assert config_model.open_kwargs == {}
 
-    @pytest.mark.xfail(reason="Not implemented yet")
-    def test__build_object_store_config(self, *args, **kwargs):
-        return super().test__build_object_store_config(*args, **kwargs)
+    def test_to_virtual_chunk_container(self, vcc_url, canonical_vc_container):
+        config_model = VirtualChunkContainerModel(
+            url_prefix=vcc_url,
+            store_type="S3Store",
+            open_kwargs=self._CEPH_STORE_OPTIONS,
+        )
+        vc_container = config_model.to_virtual_chunk_container()
 
-    @pytest.mark.xfail(reason="Not implemented yet")
-    def test_to_dict(self, *args, **kwargs):
-        return super().test_to_dict(*args, **kwargs)
+        assert vc_container == canonical_vc_container
 
-    @pytest.mark.xfail(reason="Not implemented yet")
-    def test_from_dict(self, *args, **kwargs):
-        return super().test_from_dict(*args, **kwargs)
+    def test__build_object_store_config(self, vcc_url):
+        config_model = VirtualChunkContainerModel(
+            url_prefix=vcc_url,
+            store_type="S3Store",
+            open_kwargs=self._CEPH_STORE_OPTIONS,
+        )
+
+        object_store_config = config_model._build_object_store_config()
+
+        expected_object_store_config = icechunk.s3_store(**self._CEPH_STORE_OPTIONS)
+
+        assert object_store_config == expected_object_store_config
+
+    def test_to_dict(self, vcc_url, canonical_vc_container):
+        config_model = VirtualChunkContainerModel.from_virtual_chunk_container(
+            canonical_vc_container
+        )
+
+        dict_repr = config_model.to_dict()
+
+        assert dict_repr == {
+            "url_prefix": vcc_url,
+            "store_type": "PyObjectStoreConfig_S3",
+            "open_kwargs": {},
+        }
+
+    def test_from_dict(self, vcc_url, canonical_vc_container):
+        dict_repr = {
+            "url_prefix": vcc_url,
+            "store_type": "PyObjectStoreConfig_S3",
+            "open_kwargs": {},
+        }
+        fromdict_config_model = VirtualChunkContainerModel.from_dict(dict_repr)
+
+        config_model = VirtualChunkContainerModel.from_virtual_chunk_container(
+            canonical_vc_container
+        )
+
+        assert fromdict_config_model == config_model

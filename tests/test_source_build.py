@@ -591,7 +591,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         Initialisation without a parser should trigger parser inference, which
         in turn should open the esm datastore
         """
-        store_url = icechunk_cephstore_info.icecat_bucket_url + icechunk_cephstore_info.icecat_prefix
+        store_url = f"{icechunk_cephstore_info.icecat_bucket_url}{icechunk_cephstore_info.icecat_prefix}"
         builder = IcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             icechunk_store_path=store_url,
@@ -713,7 +713,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         Initialisation with a parser should use the provided parser not instantiate
         the esm datastore until it's asked for
         """
-        store_url = icechunk_cephstore_info.icecat_bucket_url + icechunk_cephstore_info.icecat_prefix
+        store_url = f"{icechunk_cephstore_info.icecat_bucket_url}{icechunk_cephstore_info.icecat_prefix}"
         parser = virtualizarr.parsers.hdf.hdf.HDFParser
         builder = IcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
@@ -752,7 +752,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         """
         Mostly a regression test for now.
         """
-        store_url = icechunk_cephstore_info.icecat_bucket_url + icechunk_cephstore_info.icecat_prefix
+        store_url = f"{icechunk_cephstore_info.icecat_bucket_url}{icechunk_cephstore_info.icecat_prefix}"
         builder = IcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             icechunk_store_path=store_url,
@@ -883,7 +883,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         __repr__ should include all key fields with their default values when no
         optional arguments are provided.
         """
-        store_url = icechunk_cephstore_info.icecat_bucket_url + icechunk_cephstore_info.icecat_prefix
+        store_url = f"{icechunk_cephstore_info.icecat_bucket_url}{icechunk_cephstore_info.icecat_prefix}"
         builder = IcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             icechunk_store_path=store_url,
@@ -912,7 +912,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         """
         __repr__ should reflect non-default values for all optional arguments.
         """
-        store_url = icechunk_cephstore_info.icecat_bucket_url + icechunk_cephstore_info.icecat_prefix
+        store_url = f"{icechunk_cephstore_info.icecat_bucket_url}{icechunk_cephstore_info.icecat_prefix}"
         builder = IcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             icechunk_store_path=store_url,
@@ -942,7 +942,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         """
         The parser name in __repr__ should match the class name of the instantiated parser.
         """
-        store_url = icechunk_cephstore_info.icecat_bucket_url + icechunk_cephstore_info.icecat_prefix
+        store_url = f"{icechunk_cephstore_info.icecat_bucket_url}{icechunk_cephstore_info.icecat_prefix}"
         builder = IcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             icechunk_store_path=store_url,
