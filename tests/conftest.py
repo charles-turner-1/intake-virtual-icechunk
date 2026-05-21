@@ -152,16 +152,14 @@ def icechunk_cephstore_info() -> Generator[CephStoreInfo, None, None]:
         vcc_prefix=icsb.source_url_prefix.split("/")[-1],
     )
 
-    """
-    Teardown - we need to delete the store afterwards.
-    This store is publicly readable/writable, so we can just delete the objects
-    and leave the bucket there for next time.
-
-    We'll do this via obstore for consistency with everything else, but we'll need
-    creds to do anything useful here. These will also be in the repo, and we'll have
-    a periodic cleanup job running on the bucket to make sure it doesn't get too
-    cluttered with old test stores.
-    """
+    # Teardown - we need to delete the store afterwards.
+    # This store is publicly readable/writable, so we can just delete the objects
+    # and leave the bucket there for next time.
+    #
+    # We'll do this via obstore for consistency with everything else, but we'll need
+    # creds to do anything useful here. These will also be in the repo, and we'll have
+    # a periodic cleanup job running on the bucket to make sure it doesn't get too
+    # cluttered with old test stores.
     import os
 
     from dotenv import load_dotenv
