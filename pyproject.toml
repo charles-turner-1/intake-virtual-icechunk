@@ -145,6 +145,7 @@ access-intake-esm = ">=2026.4.19,<2027"
 access-nri-intake = ">=1.6.0,<2"
 netcdf4 = ">=1.7.4,<2"
 python-dotenv = ">=1.2.2,<2"
+s3fs = ">=2026.4.0,<2027"
 
 [tool.pixi.feature.test.tasks]
 test = { cmd = "pytest tests/" , description = "Run the test suite" }
