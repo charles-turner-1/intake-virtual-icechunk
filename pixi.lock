@@ -13641,7 +13641,7 @@ packages:
   - typing-extensions
   - virtualizarr
   - xarray
-  - zarr
+  - zarr>=3.2.0
   - pytest ; extra == 'test'
   - pytest-cov ; extra == 'test'
   - myst-nb ; extra == 'docs'
