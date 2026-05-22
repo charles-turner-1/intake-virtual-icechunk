@@ -6,15 +6,12 @@ from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
 
+import pytest
 from dask.distributed import Client
 
-from intake_virtual_icechunk.source import IcechunkStoreBuilder
+from intake_virtual_icechunk.source import VirtualIcechunkStoreBuilder
 
 client = Client(threads_per_worker=1)
-
-import pytest
-
-from intake_virtual_icechunk.source import VirtualIcechunkStoreBuilder
 
 
 @pytest.fixture(scope="session")
@@ -137,7 +134,7 @@ def icechunk_cephstore_info() -> Generator[CephStoreInfo, None, None]:
         "anonymous": True,
     }
 
-    icsb = IcechunkStoreBuilder(
+    icsb = VirtualIcechunkStoreBuilder(
         esm_datastore_path="s3://intake-virtual-icechunk-om2-esm-ds-container/access-om2.json",
         esm_datastore_kwargs=ESM_DATASTORE_OPTS,
         icechunk_store_path=f"s3://intake-virtual-icechunk-store/icecat-{hash_suffix}",
