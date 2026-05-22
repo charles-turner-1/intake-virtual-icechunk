@@ -253,9 +253,7 @@ class TestVirtualIcechunkStoreBuilder(BuilderTests):
 
         assert inferred_parser == parser
 
-    def test_iter_esm_groups(
-        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
-    ):
+    def test_iter_esm_groups(self, local_om2_datastore_path, intake_esm_kwargs, tmpdir):
         """The shared ESM iterator should yield one structured entry per catalog key."""
         dummy_store_path = tmpdir / "dummy_store.icechunk"
         builder = VirtualIcechunkStoreBuilder(

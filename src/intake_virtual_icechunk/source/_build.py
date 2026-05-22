@@ -426,8 +426,6 @@ class VirtualIcechunkStoreBuilder(AbstractIcechunkStoreBuilder):
         """
         from intake_virtual_icechunk.cat import VirtualIcechunkCatalogModel
 
-        esmcat = self.esm_ds.esmcat
-
         # Resolve registry first so self.source_url_prefix is available for the
         # VirtualChunkContainer config below.
         self._create_registry()
@@ -630,8 +628,6 @@ class IcechunkStoreBuilder(AbstractIcechunkStoreBuilder):
         """
         from intake_virtual_icechunk.cat import VirtualIcechunkCatalogModel
 
-        esmcat = self.esm_ds.esmcat
-
         storage = _resolve_storage(self.store_path, self.storage_options)
 
         config = icechunk.RepositoryConfig.default()
@@ -645,7 +641,9 @@ class IcechunkStoreBuilder(AbstractIcechunkStoreBuilder):
         ) as store:
             for entry in self._iter_esm_groups():
                 try:
-                    with xr.open_mfdataset(entry.file_paths, **self.xarray_kwargs) as ds:
+                    with xr.open_mfdataset(
+                        entry.file_paths, **self.xarray_kwargs
+                    ) as ds:
                         to_icechunk(ds, store.session, group=entry.public_key, mode="a")
 
                     zarr_group = zarr.open_group(store, path=entry.public_key, mode="a")
