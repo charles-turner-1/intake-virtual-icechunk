@@ -561,7 +561,9 @@ class TestVirtualIcechunkStoreBuilder(BuilderTests):
         mock_esm_ds.esmcat.assets.format.value = "csv"
         builder._esm_ds = mock_esm_ds
 
-        with pytest.raises(ParserInferenceError, match="Unsupported parser format 'csv'"):
+        with pytest.raises(
+            ParserInferenceError, match="Unsupported parser format 'csv'"
+        ):
             builder._infer_parser()
 
     def test_build_virtual_concat_dim_fallback_failure(
