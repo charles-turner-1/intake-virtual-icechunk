@@ -67,6 +67,12 @@ class ParserInferenceError(IcechunkBuildError):
     pass
 
 
+class GroupEntryError(IcechunkBuildError):
+    """Raised when a builder entry is missing data required by a build path."""
+
+    pass
+
+
 @dataclass
 class DataStoreStructure:
     groupby_attrs: list[str]
@@ -75,10 +81,63 @@ class DataStoreStructure:
 
 @dataclass
 class GroupEntry:
+    """One logical dataset-group entry consumed by a builder.
+
+    The current intake-esm path can populate all fields, but later sources may
+    only be able to supply a subset. Builder paths should therefore request the
+    specific payload they need via the helper methods below rather than reaching
+    directly into the raw attributes.
+    """
+
     public_key: str
-    group_df: pd.DataFrame
     group_attrs: dict[str, Any]
-    file_paths: list[str]
+    metadata_df: pd.DataFrame | None = None
+    source_file_paths: list[str] | None = None
+
+    @classmethod
+    def from_esm_group(
+        cls,
+        *,
+        public_key: str,
+        group_df: pd.DataFrame,
+        groupby_attrs: list[str],
+        assets_col: str,
+    ) -> GroupEntry:
+        """Construct a builder entry from one grouped intake-esm dataframe slice."""
+
+        group_attrs = {
+            attr: group_df[attr].iloc[0]
+            for attr in groupby_attrs
+            if attr in group_df.columns
+        }
+        file_paths: list[str] = group_df[assets_col].tolist()
+        return cls(
+            public_key=public_key,
+            group_attrs=group_attrs,
+            metadata_df=group_df,
+            source_file_paths=file_paths,
+        )
+
+    @property
+    def group_df(self) -> pd.DataFrame:
+        """Return the metadata dataframe required by catalog-shaped builder paths."""
+
+        if self.metadata_df is None:
+            raise GroupEntryError(
+                "Group entry "
+                f"'{self.public_key}' does not include a metadata dataframe."
+            )
+        return self.metadata_df
+
+    @property
+    def file_paths(self) -> list[str]:
+        """Return the source paths required by source-asset builder paths."""
+
+        if not self.source_file_paths:
+            raise GroupEntryError(
+                f"Group entry '{self.public_key}' does not include source file paths."
+            )
+        return self.source_file_paths
 
 
 class AbstractIcechunkStoreBuilder(abc.ABC):
@@ -176,24 +235,30 @@ class AbstractIcechunkStoreBuilder(abc.ABC):
 
         for public_key, internal_key in esmcat._construct_group_keys().items():
             group_df: pd.DataFrame = grouped.get_group(internal_key)
-            group_attrs = {
-                attr: group_df[attr].iloc[0]
-                for attr in structure.groupby_attrs
-                if attr in group_df.columns
-            }
-            file_paths: list[str] = group_df[structure.assets_col].tolist()
-
-            yield GroupEntry(
+            yield GroupEntry.from_esm_group(
                 public_key=public_key,
                 group_df=group_df,
-                group_attrs=group_attrs,
-                file_paths=file_paths,
+                groupby_attrs=structure.groupby_attrs,
+                assets_col=structure.assets_col,
             )
 
     @abc.abstractmethod
     def build(self) -> None:
         """Build the Icechunk store from the intake-esm catalog."""
         ...
+
+    def _attach_entry_metadata(
+        self,
+        zarr_group: zarr.Group,
+        entry: GroupEntry,
+    ) -> None:
+        """Attach metadata from a builder entry to a written Zarr group."""
+
+        self._attach_catalog_metadata(
+            zarr_group,
+            entry.group_df,
+            entry.group_attrs,
+        )
 
     def _attach_catalog_metadata(
         self,
@@ -485,9 +550,7 @@ class VirtualIcechunkStoreBuilder(AbstractIcechunkStoreBuilder):
                     zarr_group = zarr.open_group(store, path=entry.public_key, mode="a")
                     # Would make more sense to merge group_attrs and esm_ds_metadata
                     # first in a sensible way
-                    self._attach_catalog_metadata(
-                        zarr_group, entry.group_df, entry.group_attrs
-                    )
+                    self._attach_entry_metadata(zarr_group, entry)
 
                     print(f"Virtualised group {entry.public_key} successfully!")
                 except Exception as e:
@@ -511,9 +574,7 @@ class VirtualIcechunkStoreBuilder(AbstractIcechunkStoreBuilder):
                             zarr_group = zarr.open_group(
                                 store, path=entry.public_key, mode="a"
                             )
-                            self._attach_catalog_metadata(
-                                zarr_group, entry.group_df, entry.group_attrs
-                            )
+                            self._attach_entry_metadata(zarr_group, entry)
 
                             print(f"Virtualised group {entry.public_key} successfully!")
                         except Exception as e:
@@ -647,9 +708,7 @@ class IcechunkStoreBuilder(AbstractIcechunkStoreBuilder):
                         to_icechunk(ds, store.session, group=entry.public_key, mode="a")
 
                     zarr_group = zarr.open_group(store, path=entry.public_key, mode="a")
-                    self._attach_catalog_metadata(
-                        zarr_group, entry.group_df, entry.group_attrs
-                    )
+                    self._attach_entry_metadata(zarr_group, entry)
 
                     print(f"Wrote group {entry.public_key} successfully!")
                 except Exception as e:
@@ -690,9 +749,7 @@ class IcechunkStoreBuilder(AbstractIcechunkStoreBuilder):
                             zarr_group = zarr.open_group(
                                 store, path=entry.public_key, mode="a"
                             )
-                            self._attach_catalog_metadata(
-                                zarr_group, entry.group_df, entry.group_attrs
-                            )
+                            self._attach_entry_metadata(zarr_group, entry)
 
                             print(f"Wrote group {entry.public_key} successfully!")
                         except Exception as e:
