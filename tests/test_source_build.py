@@ -510,6 +510,18 @@ class TestVirtualIcechunkStoreBuilder(BuilderTests):
 class TestIcechunkStoreBuilderIsAbstract:
     """Verify that IcechunkStoreBuilder cannot be instantiated directly."""
 
+    @pytest.fixture
+    def intake_esm_kwargs(self) -> dict[str, list[str]]:
+        return {
+            "columns_with_iterables": [
+                "variable",
+                "variable_long_name",
+                "variable_standard_name",
+                "variable_cell_methods",
+                "variable_units",
+            ]
+        }
+
     def test_cannot_instantiate_abstract_base(
         self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
     ):
