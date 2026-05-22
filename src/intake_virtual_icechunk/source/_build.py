@@ -210,7 +210,8 @@ class AbstractIcechunkStoreBuilder(abc.ABC):
 
         for column in group_df.columns:
             if column not in zarr_group.attrs:
-                zarr_group.attrs[column] = group_df[column].iloc[0]
+                # This should never actualy execute.
+                zarr_group.attrs[column] = group_df[column].iloc[0]  # pragma: no cover
 
 
 class VirtualIcechunkStoreBuilder(AbstractIcechunkStoreBuilder):
