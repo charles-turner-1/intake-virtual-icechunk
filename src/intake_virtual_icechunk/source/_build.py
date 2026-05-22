@@ -15,6 +15,7 @@ import pandas as pd
 import polars as pl
 import xarray as xr
 import zarr
+from icechunk.xarray import to_icechunk
 from intake_esm.core import esm_datastore
 from intake_esm.utils import MinimalExploder
 from obstore.store import from_url as _obs_from_url
@@ -472,23 +473,27 @@ class VirtualIcechunkStoreBuilder(IcechunkStoreBuilder):
                         self.failed_list.append((public_key, e))
                         print(f"Failed to virtualise group {public_key}: {e}")
                     else:
-                        with open_virtual_dataset(
-                            url=file_paths[0],
-                            parser=self.parser,
-                            registry=self.obstore_registry,
-                            decode_times=False,
-                        ) as vds:
-                            vds.vz.to_icechunk(store, group=public_key)
-                        # Write group metadata into .zattrs so the catalog can search
-                        # these groups without opening the arrays.
-                        zarr_group = zarr.open_group(store, path=public_key, mode="a")
-                        self._attach_catalog_metadata(zarr_group, group_df, group_attrs)
+                        try:
+                            with open_virtual_dataset(
+                                url=file_paths[0],
+                                parser=self.parser,
+                                registry=self.obstore_registry,
+                                decode_times=False,
+                            ) as vds:
+                                vds.vz.to_icechunk(store, group=public_key)
+                            # Write group metadata into .zattrs so the catalog can search
+                            # these groups without opening the arrays.
+                            zarr_group = zarr.open_group(
+                                store, path=public_key, mode="a"
+                            )
+                            self._attach_catalog_metadata(
+                                zarr_group, group_df, group_attrs
+                            )
 
-                        print(f"Virtualised group {public_key} successfully!")
-
-                except Exception as e:
-                    self.failed_list.append((public_key, e))
-                    print(f"Failed to virtualise group {public_key}: {e}")
+                            print(f"Virtualised group {public_key} successfully!")
+                        except Exception as e:
+                            self.failed_list.append((public_key, e))
+                            print(f"Failed to virtualise group {public_key}: {e}")
 
         # Write the JSON sidecar inside the store directory
         sidecar_fname = _intake_cat_filename(self.store_path)
@@ -629,16 +634,42 @@ class ZarrIcechunkStoreBuilder(IcechunkStoreBuilder):
                 file_paths: list[str] = group_df[assets_col].tolist()
 
                 try:
-                    ds = xr.open_mfdataset(file_paths, **self.xarray_kwargs)
-                    ds.to_zarr(store, group=public_key, mode="a")
+                    with xr.open_mfdataset(file_paths, **self.xarray_kwargs) as ds:
+                        to_icechunk(ds, store.session, group=public_key, mode="a")
 
                     zarr_group = zarr.open_group(store, path=public_key, mode="a")
                     self._attach_catalog_metadata(zarr_group, group_df, group_attrs)
 
                     print(f"Wrote group {public_key} successfully!")
                 except Exception as e:
-                    self.failed_list.append((public_key, e))
-                    print(f"Failed to write group {public_key}: {e}")
+                    if (
+                        "Could not find any dimension coordinates to use to order the Dataset objects for concatenation"
+                        not in str(e)
+                    ):
+                        self.failed_list.append((public_key, e))
+                        print(f"Failed to virtualise group {public_key}: {e}")
+                    else:
+                        try:
+                            with xr.open_dataset(
+                                file_paths[0],
+                                **self.xarray_kwargs,
+                            ) as ds:
+                                to_icechunk(
+                                    ds, store.session, group=public_key, mode="a"
+                                )
+                            # Write group metadata into .zattrs so the catalog can search
+                            # these groups without opening the arrays.
+                            zarr_group = zarr.open_group(
+                                store, path=public_key, mode="a"
+                            )
+                            self._attach_catalog_metadata(
+                                zarr_group, group_df, group_attrs
+                            )
+
+                            print(f"Wrote group {public_key} successfully!")
+                        except Exception as e:
+                            self.failed_list.append((public_key, e))
+                            print(f"Failed to write group {public_key}: {e}")
 
         # Write the JSON sidecar inside the store directory
         sidecar_fname = _intake_cat_filename(self.store_path)
