@@ -3,7 +3,7 @@ import uuid
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import icechunk
 import intake
@@ -17,10 +17,14 @@ from intake_esm import esm_datastore
 from obstore.store import ObjectStore, from_url
 from pandas.testing import assert_frame_equal
 
-from intake_virtual_icechunk.source import IcechunkStoreBuilder
+from intake_virtual_icechunk.source import (
+    AbstractIcechunkStoreBuilder,
+    IcechunkStoreBuilder,
+    VirtualIcechunkStoreBuilder,
+)
 from intake_virtual_icechunk.utils import _intake_cat_filename
 
-__all__ = ["IcechunkStoreBuilder", "pytest"]
+__all__ = ["VirtualIcechunkStoreBuilder", "pytest"]
 
 
 @pytest.fixture(scope="session")
@@ -149,10 +153,9 @@ class BuilderTests:
         raise NotImplementedError("Base test, to be implemented by child classes")
 
 
-class TestIcechunkLocalStoreBuilder(BuilderTests):
+class TestVirtualIcechunkStoreBuilder(BuilderTests):
     """
-    Tests for the IcechunkStoreBuilder class, which is responsible for building
-    an IcechunkStore from a given intake-esm datastore.
+    Tests for VirtualIcechunkStoreBuilder (the virtual-reference builder).
     """
 
     @pytest.fixture
@@ -188,7 +191,7 @@ class TestIcechunkLocalStoreBuilder(BuilderTests):
         in turn should open the esm datastore
         """
         dummy_store_path = tmpdir / "dummy_store.icechunk"
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=local_om2_datastore_path,
             icechunk_store_path=dummy_store_path,
             esm_datastore_kwargs=intake_esm_kwargs,
@@ -206,7 +209,7 @@ class TestIcechunkLocalStoreBuilder(BuilderTests):
         """
         dummy_store_path = tmpdir / "dummy_store.icechunk"
         parser = virtualizarr.parsers.hdf.hdf.HDFParser
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=local_om2_datastore_path,
             esm_datastore_kwargs=intake_esm_kwargs,
             icechunk_store_path=dummy_store_path,
@@ -236,7 +239,7 @@ class TestIcechunkLocalStoreBuilder(BuilderTests):
         """
 
         dummy_store_path = tmpdir / "dummy_store.icechunk"
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=local_om2_datastore_path,
             esm_datastore_kwargs=intake_esm_kwargs,
             icechunk_store_path=dummy_store_path,
@@ -255,7 +258,7 @@ class TestIcechunkLocalStoreBuilder(BuilderTests):
         store type and storage options.
         """
         dummy_store_path = tmpdir / "dummy_store.icechunk"
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=local_om2_datastore_path,
             esm_datastore_kwargs=intake_esm_kwargs,
             icechunk_store_path=dummy_store_path,
@@ -280,7 +283,7 @@ class TestIcechunkLocalStoreBuilder(BuilderTests):
         going to change the parser
         """
         dummy_store_path = tmpdir / "dummy_store.icechunk"
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=local_om2_datastore_path,
             icechunk_store_path=dummy_store_path,
             esm_datastore_kwargs=intake_esm_kwargs,
@@ -309,7 +312,7 @@ class TestIcechunkLocalStoreBuilder(BuilderTests):
         This should trigger a specific failure mode that we want to check is handled correctly.
         """
         dummy_store_path = tmpdir / "dummy_store.icechunk"
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=local_om2_datastore_path,
             icechunk_store_path=dummy_store_path,
             esm_datastore_kwargs=intake_esm_kwargs,
@@ -344,7 +347,7 @@ class TestIcechunkLocalStoreBuilder(BuilderTests):
         This should trigger a specific failure mode that we want to check is handled correctly.
         """
         dummy_store_path = tmpdir / "dummy_store.icechunk"
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=local_om2_datastore_path,
             icechunk_store_path=dummy_store_path,
             esm_datastore_kwargs=intake_esm_kwargs,
@@ -367,7 +370,7 @@ class TestIcechunkLocalStoreBuilder(BuilderTests):
             raise builder.failed_list[0][1]
 
         dummy_store_path_2 = tmpdir / "dummy_store2.icechunk"
-        builder_2 = IcechunkStoreBuilder(
+        builder_2 = VirtualIcechunkStoreBuilder(
             esm_datastore_path=local_om2_datastore_path,
             esm_datastore_kwargs=intake_esm_kwargs,
             icechunk_store_path=dummy_store_path_2,
@@ -391,7 +394,7 @@ class TestIcechunkLocalStoreBuilder(BuilderTests):
         This is a regression test for a specific issue we had where if the column to de-iterate had some null values, the de-iteration would fail.
         """
         dummy_store_path = tmpdir / "dummy_store.icechunk"
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=local_om2_datastore_path,
             icechunk_store_path=dummy_store_path,
             esm_datastore_kwargs=intake_esm_kwargs,
@@ -412,7 +415,7 @@ class TestIcechunkLocalStoreBuilder(BuilderTests):
         optional arguments are provided.
         """
         dummy_store_path = tmpdir / "dummy_store.icechunk"
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=local_om2_datastore_path,
             icechunk_store_path=dummy_store_path,
             esm_datastore_kwargs=intake_esm_kwargs,
@@ -427,7 +430,7 @@ class TestIcechunkLocalStoreBuilder(BuilderTests):
         assert "store_options={}" in result
         assert "drop_cols=[]" in result
         assert "cols_to_deiter=[]" in result
-        assert result.startswith("IcechunkStoreBuilder(")
+        assert result.startswith("VirtualIcechunkStoreBuilder(")
         assert result.endswith(")")
 
     def test_repr_with_custom_args(
@@ -437,7 +440,7 @@ class TestIcechunkLocalStoreBuilder(BuilderTests):
         __repr__ should reflect non-default values for all optional arguments.
         """
         dummy_store_path = tmpdir / "dummy_store.icechunk"
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=local_om2_datastore_path,
             icechunk_store_path=dummy_store_path,
             esm_datastore_kwargs=intake_esm_kwargs,
@@ -463,7 +466,7 @@ class TestIcechunkLocalStoreBuilder(BuilderTests):
         The parser name in __repr__ should match the class name of the instantiated parser.
         """
         dummy_store_path = tmpdir / "dummy_store.icechunk"
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=local_om2_datastore_path,
             icechunk_store_path=dummy_store_path,
             esm_datastore_kwargs=intake_esm_kwargs,
@@ -481,7 +484,7 @@ class TestIcechunkLocalStoreBuilder(BuilderTests):
         This is a regression test for a specific issue we had where if the column to de-iterate had some null values, the de-iteration would fail.
         """
         dummy_store_path = tmpdir / "dummy_store.icechunk"
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=local_om2_datastore_path,
             esm_datastore_kwargs=intake_esm_kwargs,
             icechunk_store_path=dummy_store_path,
@@ -502,6 +505,337 @@ class TestIcechunkLocalStoreBuilder(BuilderTests):
             cat.df.loc["ocean.fx.xt_ocean:1.yt_ocean:1.point"].variable_standard_name
             is None
         )
+
+    def test_infer_parser_missing_format_attribute(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """_infer_parser raises ParserInferenceError when assets.format has no .value attribute."""
+        from intake_virtual_icechunk.source._build import ParserInferenceError
+
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = VirtualIcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+            icechunk_store_path=dummy_store_path,
+        )
+        # MagicMock(spec=[]) exposes no attributes — accessing .value raises AttributeError
+        mock_esm_ds = MagicMock()
+        mock_esm_ds.esmcat.assets.format = MagicMock(spec=[])
+        builder._esm_ds = mock_esm_ds
+
+        with pytest.raises(ParserInferenceError, match="Cannot infer parser"):
+            builder._infer_parser()
+
+    def test_infer_parser_format_none(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """_infer_parser raises ParserInferenceError when format.value is None."""
+        from intake_virtual_icechunk.source._build import ParserInferenceError
+
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = VirtualIcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+            icechunk_store_path=dummy_store_path,
+        )
+        mock_esm_ds = MagicMock()
+        mock_esm_ds.esmcat.assets.format.value = None
+        builder._esm_ds = mock_esm_ds
+
+        with pytest.raises(ParserInferenceError, match="Cannot infer parser"):
+            builder._infer_parser()
+
+    def test_infer_parser_unknown_format(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """_infer_parser raises ParserInferenceError when format.value is not in PARSER_MAP."""
+        from intake_virtual_icechunk.source._build import ParserInferenceError
+
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = VirtualIcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+            icechunk_store_path=dummy_store_path,
+        )
+        mock_esm_ds = MagicMock()
+        mock_esm_ds.esmcat.assets.format.value = "csv"
+        builder._esm_ds = mock_esm_ds
+
+        with pytest.raises(
+            ParserInferenceError, match="Unsupported parser format 'csv'"
+        ):
+            builder._infer_parser()
+
+    def test_build_virtual_concat_dim_fallback_failure(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """When the concat-dim fallback's open_virtual_dataset also fails, each group
+        lands in failed_list and the build raises IcechunkError."""
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = VirtualIcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+            icechunk_store_path=dummy_store_path,
+        )
+        concat_dim_msg = (
+            "Could not find any dimension coordinates to use to order "
+            "the Dataset objects for concatenation"
+        )
+        with pytest.raises(
+            icechunk.IcechunkError,
+            match="cannot commit, no changes made to the session",
+        ):
+            with patch(
+                "intake_virtual_icechunk.source._build.open_virtual_mfdataset",
+                side_effect=ValueError(concat_dim_msg),
+            ):
+                with patch(
+                    "intake_virtual_icechunk.source._build.open_virtual_dataset",
+                    side_effect=RuntimeError("single file virtualisation also failed"),
+                ):
+                    builder.build()
+
+        assert len(builder.failed_list) == len(builder.esm_ds.keys())
+        assert set(fl[0] for fl in builder.failed_list) == set(builder.esm_ds.keys())
+
+
+class TestIcechunkStoreBuilderIsAbstract:
+    """Verify that IcechunkStoreBuilder cannot be instantiated directly."""
+
+    @pytest.fixture
+    def intake_esm_kwargs(self) -> dict[str, list[str]]:
+        return {
+            "columns_with_iterables": [
+                "variable",
+                "variable_long_name",
+                "variable_standard_name",
+                "variable_cell_methods",
+                "variable_units",
+            ]
+        }
+
+    def test_cannot_instantiate_abstract_base(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        import pytest
+
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        with pytest.raises(TypeError, match="Can't instantiate abstract class"):
+            AbstractIcechunkStoreBuilder(
+                esm_datastore_path=local_om2_datastore_path,
+                icechunk_store_path=dummy_store_path,
+                esm_datastore_kwargs=intake_esm_kwargs,
+            )
+
+
+class TestZarrIcechunkStoreBuilder:
+    """Tests for ZarrIcechunkStoreBuilder (the real-data builder)."""
+
+    @pytest.fixture
+    def intake_esm_kwargs(self) -> dict[str, list[str]]:
+        return {
+            "columns_with_iterables": [
+                "variable",
+                "variable_long_name",
+                "variable_standard_name",
+                "variable_cell_methods",
+                "variable_units",
+            ]
+        }
+
+    def test_init(self, local_om2_datastore_path, intake_esm_kwargs, tmpdir):
+        """Initialisation should store all parameters and not open the datastore."""
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            icechunk_store_path=dummy_store_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+        )
+
+        assert builder._esm_ds is None
+        assert builder.xarray_kwargs == {}
+        assert builder.storage_options == {}
+        assert builder.drop_cols == []
+        assert builder.cols_to_deiter == []
+
+    def test_init_with_xarray_kwargs(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """xarray_kwargs should be forwarded and stored."""
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            icechunk_store_path=dummy_store_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+            xarray_kwargs={"decode_times": False},
+        )
+
+        assert builder.xarray_kwargs == {"decode_times": False}
+
+    def test_repr_defaults(self, local_om2_datastore_path, intake_esm_kwargs, tmpdir):
+        """__repr__ should show all fields and start with the class name."""
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            icechunk_store_path=dummy_store_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+        )
+
+        result = repr(builder)
+
+        assert result.startswith("ZarrIcechunkStoreBuilder(")
+        assert result.endswith(")")
+        assert f"esm_datastore_path='{builder.esm_datastore_path}'" in result
+        assert f"icechunk_store_path='{builder.store_path}'" in result
+        assert "xarray_kwargs={}" in result
+        assert "storage_options={}" in result
+        assert "drop_cols=[]" in result
+        assert "cols_to_deiter=[]" in result
+
+    def test_repr_with_custom_args(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """__repr__ should reflect non-default values."""
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            icechunk_store_path=dummy_store_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+            xarray_kwargs={"decode_times": False},
+            icechunk_storage_options={"key": "value"},
+            drop_cols=["path"],
+            cols_to_deiter=["variable"],
+        )
+
+        result = repr(builder)
+
+        assert "xarray_kwargs={'decode_times': False}" in result
+        assert "storage_options={'key': 'value'}" in result
+        assert "drop_cols=['path']" in result
+        assert "cols_to_deiter=['variable']" in result
+
+    def test_clean_build(self, local_om2_datastore_path, intake_esm_kwargs, tmpdir):
+        """
+        Build should create an Icechunk store with one group per catalog entry,
+        a JSON sidecar with no virtual_chunk_model, and zero failures.
+        """
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            icechunk_store_path=dummy_store_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+        )
+
+        builder.build()
+
+        assert Path(builder.store_path).exists()
+        assert Path(builder.store_path).is_dir()
+
+        fname = _intake_cat_filename(builder.store_path)
+        assert (Path(builder.store_path) / fname).exists()
+        assert builder.failed_list == []
+
+    def test_build_sidecar_has_no_virtual_chunk_model(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """
+        The JSON sidecar written by ZarrIcechunkStoreBuilder must have
+        virtual_chunk_model set to null (None).
+        """
+        import json
+
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            icechunk_store_path=dummy_store_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+        )
+        builder.build()
+
+        fname = _intake_cat_filename(builder.store_path)
+        sidecar_path = Path(builder.store_path) / fname
+        with open(sidecar_path) as f:
+            sidecar = json.load(f)
+
+        assert sidecar["virtual_chunk_model"] is None
+
+    def test_catalog_round_trip(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """
+        A store built by ZarrIcechunkStoreBuilder should be openable via
+        IcechunkCatalog without needing virtual-chunk credentials.
+        """
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            icechunk_store_path=dummy_store_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+        )
+        builder.build()
+
+        cat = intake.open_virtual_icechunk(str(dummy_store_path))
+
+        assert cat.virtual_chunk_model is None
+        assert cat.virtual_chunk_container is None
+        assert len(cat) == len(builder.esm_ds.keys())
+        assert set(cat.keys()) == set(builder.esm_ds.keys())
+
+    def test_build_all_failures(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """When xr.open_mfdataset fails with a non-concat-dim error, all groups land
+        in failed_list and the build raises IcechunkError."""
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            icechunk_store_path=dummy_store_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+        )
+        with pytest.raises(
+            icechunk.IcechunkError,
+            match="cannot commit, no changes made to the session",
+        ):
+            with patch(
+                "xarray.open_mfdataset",
+                side_effect=RuntimeError("simulated generic failure"),
+            ):
+                builder.build()
+
+        assert len(builder.failed_list) == len(builder.esm_ds.keys())
+        assert set(fl[0] for fl in builder.failed_list) == set(builder.esm_ds.keys())
+
+    def test_build_concat_dim_fallback_failure(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """When the concat-dim fallback's xr.open_dataset also fails, all groups land
+        in failed_list and the build raises IcechunkError."""
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            icechunk_store_path=dummy_store_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+        )
+        concat_dim_msg = (
+            "Could not find any dimension coordinates to use to order "
+            "the Dataset objects for concatenation"
+        )
+        with pytest.raises(
+            icechunk.IcechunkError,
+            match="cannot commit, no changes made to the session",
+        ):
+            with patch(
+                "xarray.open_mfdataset",
+                side_effect=ValueError(concat_dim_msg),
+            ):
+                with patch(
+                    "xarray.open_dataset",
+                    side_effect=RuntimeError("single file open also failed"),
+                ):
+                    builder.build()
+
+        assert len(builder.failed_list) == len(builder.esm_ds.keys())
+        assert set(fl[0] for fl in builder.failed_list) == set(builder.esm_ds.keys())
 
 
 class TestIcechunkCephStoreBuilder(BuilderTests):
@@ -604,7 +938,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         in turn should open the esm datastore
         """
         store_url = f"{icechunk_cephstore_info.icecat_bucket_url}{icechunk_cephstore_info.icecat_prefix}"
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             icechunk_store_path=store_url,
             esm_datastore_kwargs=esm_datastore_kwargs,
@@ -621,7 +955,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         icechunk_store_opts,
         icechunk_storage_opts,
     ):
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             esm_datastore_kwargs=esm_datastore_kwargs,
             icechunk_store_path=icecat_store_tmp_url,
@@ -658,7 +992,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         icechunk_store_opts,
         icechunk_storage_opts,
     ):
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             esm_datastore_kwargs=esm_datastore_kwargs,
             icechunk_store_path=icecat_store_tmp_url,
@@ -690,7 +1024,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         going to change the parser to one that doesn't support concatenation along a dimension.
         This should trigger a specific failure mode that we want to check is handled correctly.
         """
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             esm_datastore_kwargs=esm_datastore_kwargs,
             icechunk_store_path=icecat_store_tmp_url,
@@ -727,7 +1061,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         """
         store_url = f"{icechunk_cephstore_info.icecat_bucket_url}{icechunk_cephstore_info.icecat_prefix}"
         parser = virtualizarr.parsers.hdf.hdf.HDFParser
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             icechunk_store_path=store_url,
             esm_datastore_kwargs=esm_datastore_kwargs,
@@ -765,7 +1099,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         Mostly a regression test for now.
         """
         store_url = f"{icechunk_cephstore_info.icecat_bucket_url}{icechunk_cephstore_info.icecat_prefix}"
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             icechunk_store_path=store_url,
             esm_datastore_kwargs=esm_datastore_kwargs,
@@ -794,7 +1128,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         going to change the parser to one that doesn't support concatenation along a dimension.
         This should trigger a specific failure mode that we want to check is handled correctly.
         """
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             esm_datastore_kwargs=esm_datastore_kwargs,
             icechunk_store_path=icecat_store_tmp_url,
@@ -822,7 +1156,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         second_store_url = f"{bucket_base_url}/icecat-{second_hash}"
 
         try:
-            builder_2 = IcechunkStoreBuilder(
+            builder_2 = VirtualIcechunkStoreBuilder(
                 esm_datastore_path=esm_datastore_path,
                 esm_datastore_kwargs=esm_datastore_kwargs,
                 icechunk_store_path=second_store_url,
@@ -867,7 +1201,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         Test that the build method correctly de-iterates columns specified in the cols_to_deiter argument.
         This is a regression test for a specific issue we had where if the column to de-iterate had some null values, the de-iteration would fail.
         """
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             esm_datastore_kwargs=esm_datastore_kwargs,
             icechunk_store_path=icecat_store_tmp_url,
@@ -895,7 +1229,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         icechunk_storage_opts,
     ):
         """Build a Ceph-backed catalog, reopen it, and read real data back."""
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             esm_datastore_kwargs=esm_datastore_kwargs,
             icechunk_store_path=icecat_store_tmp_url,
@@ -940,7 +1274,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         optional arguments are provided.
         """
         store_url = f"{icechunk_cephstore_info.icecat_bucket_url}{icechunk_cephstore_info.icecat_prefix}"
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             icechunk_store_path=store_url,
             esm_datastore_kwargs=esm_datastore_kwargs,
@@ -954,7 +1288,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         assert f"parser={builder.parser.__class__.__name__}" in result
         assert "drop_cols=[]" in result
         assert "cols_to_deiter=[]" in result
-        assert result.startswith("IcechunkStoreBuilder(")
+        assert result.startswith("VirtualIcechunkStoreBuilder(")
         assert result.endswith(")")
 
     def test_repr_with_custom_args(
@@ -969,7 +1303,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         __repr__ should reflect non-default values for all optional arguments.
         """
         store_url = f"{icechunk_cephstore_info.icecat_bucket_url}{icechunk_cephstore_info.icecat_prefix}"
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             icechunk_store_path=store_url,
             esm_datastore_kwargs=esm_datastore_kwargs,
@@ -999,7 +1333,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         The parser name in __repr__ should match the class name of the instantiated parser.
         """
         store_url = f"{icechunk_cephstore_info.icecat_bucket_url}{icechunk_cephstore_info.icecat_prefix}"
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             icechunk_store_path=store_url,
             esm_datastore_kwargs=esm_datastore_kwargs,
@@ -1022,7 +1356,7 @@ class TestIcechunkCephStoreBuilder(BuilderTests):
         Test that the build method correctly de-iterates columns specified in the cols_to_deiter argument.
         This is a regression test for a specific issue we had where if the column to de-iterate had some null values, the de-iteration would fail.
         """
-        builder = IcechunkStoreBuilder(
+        builder = VirtualIcechunkStoreBuilder(
             esm_datastore_path=esm_datastore_path,
             esm_datastore_kwargs=esm_datastore_kwargs,
             icechunk_store_path=icecat_store_tmp_url,
