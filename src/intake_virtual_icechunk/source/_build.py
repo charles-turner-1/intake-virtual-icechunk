@@ -532,7 +532,7 @@ class VirtualIcechunkStoreBuilder(AbstractIcechunkStoreBuilder):
                 vds.vz.to_icechunk(store, group=entry.public_key)
         except Exception as exc:
             if not self._is_concat_dim_order_error(exc):
-                raise
+                raise exc
 
             with open_virtual_dataset(
                 url=entry.file_paths[0],
@@ -714,7 +714,7 @@ class IcechunkStoreBuilder(AbstractIcechunkStoreBuilder):
                 to_icechunk(ds, store.session, group=entry.public_key, mode="a")
         except Exception as exc:
             if not self._is_concat_dim_order_error(exc):
-                raise
+                raise exc
 
             # Filter out mfdataset specific kwargs that would cause the single-dataset open to fail
             kwargs = {
