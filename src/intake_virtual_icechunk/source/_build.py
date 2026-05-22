@@ -123,7 +123,8 @@ class GroupEntry:
 
         if self.group_df is None:
             raise GroupEntryError(
-                f"Group entry '{self.public_key}' does not include a metadata dataframe."
+                "Group entry "
+                f"'{self.public_key}' does not include a metadata dataframe."
             )
         return self.group_df
 

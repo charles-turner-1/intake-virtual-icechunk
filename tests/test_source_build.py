@@ -283,7 +283,7 @@ class TestVirtualIcechunkStoreBuilder(BuilderTests):
         assert set(entry.group_attrs).issubset(set(group_df.columns))
 
     def test_group_entry_requirements(self):
-        """Entry helpers should fail clearly when a builder path lacks required payloads."""
+        """Entry helpers should fail clearly when a path lacks payloads."""
         missing_paths = GroupEntry(
             public_key="foo", group_attrs={}, group_df=pd.DataFrame()
         )
