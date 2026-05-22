@@ -3,7 +3,7 @@ import uuid
 from collections.abc import Generator
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import icechunk
 import intake
@@ -506,6 +506,96 @@ class TestVirtualIcechunkStoreBuilder(BuilderTests):
             is None
         )
 
+    def test_infer_parser_missing_format_attribute(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """_infer_parser raises ParserInferenceError when assets.format has no .value attribute."""
+        from intake_virtual_icechunk.source._build import ParserInferenceError
+
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = VirtualIcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+            icechunk_store_path=dummy_store_path,
+        )
+        # MagicMock(spec=[]) exposes no attributes — accessing .value raises AttributeError
+        mock_esm_ds = MagicMock()
+        mock_esm_ds.esmcat.assets.format = MagicMock(spec=[])
+        builder._esm_ds = mock_esm_ds
+
+        with pytest.raises(ParserInferenceError, match="Cannot infer parser"):
+            builder._infer_parser()
+
+    def test_infer_parser_format_none(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """_infer_parser raises ParserInferenceError when format.value is None."""
+        from intake_virtual_icechunk.source._build import ParserInferenceError
+
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = VirtualIcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+            icechunk_store_path=dummy_store_path,
+        )
+        mock_esm_ds = MagicMock()
+        mock_esm_ds.esmcat.assets.format.value = None
+        builder._esm_ds = mock_esm_ds
+
+        with pytest.raises(ParserInferenceError, match="Cannot infer parser"):
+            builder._infer_parser()
+
+    def test_infer_parser_unknown_format(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """_infer_parser raises ParserInferenceError when format.value is not in PARSER_MAP."""
+        from intake_virtual_icechunk.source._build import ParserInferenceError
+
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = VirtualIcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+            icechunk_store_path=dummy_store_path,
+        )
+        mock_esm_ds = MagicMock()
+        mock_esm_ds.esmcat.assets.format.value = "csv"
+        builder._esm_ds = mock_esm_ds
+
+        with pytest.raises(ParserInferenceError, match="Unsupported parser format 'csv'"):
+            builder._infer_parser()
+
+    def test_build_virtual_concat_dim_fallback_failure(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """When the concat-dim fallback's open_virtual_dataset also fails, each group
+        lands in failed_list and the build raises IcechunkError."""
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = VirtualIcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+            icechunk_store_path=dummy_store_path,
+        )
+        concat_dim_msg = (
+            "Could not find any dimension coordinates to use to order "
+            "the Dataset objects for concatenation"
+        )
+        with pytest.raises(
+            icechunk.IcechunkError,
+            match="cannot commit, no changes made to the session",
+        ):
+            with patch(
+                "intake_virtual_icechunk.source._build.open_virtual_mfdataset",
+                side_effect=ValueError(concat_dim_msg),
+            ):
+                with patch(
+                    "intake_virtual_icechunk.source._build.open_virtual_dataset",
+                    side_effect=RuntimeError("single file virtualisation also failed"),
+                ):
+                    builder.build()
+
+        assert len(builder.failed_list) == len(builder.esm_ds.keys())
+        assert set(fl[0] for fl in builder.failed_list) == set(builder.esm_ds.keys())
+
 
 class TestIcechunkStoreBuilderIsAbstract:
     """Verify that IcechunkStoreBuilder cannot be instantiated directly."""
@@ -688,6 +778,62 @@ class TestZarrIcechunkStoreBuilder:
         assert cat.virtual_chunk_container is None
         assert len(cat) == len(builder.esm_ds.keys())
         assert set(cat.keys()) == set(builder.esm_ds.keys())
+
+    def test_build_all_failures(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """When xr.open_mfdataset fails with a non-concat-dim error, all groups land
+        in failed_list and the build raises IcechunkError."""
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            icechunk_store_path=dummy_store_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+        )
+        with pytest.raises(
+            icechunk.IcechunkError,
+            match="cannot commit, no changes made to the session",
+        ):
+            with patch(
+                "xarray.open_mfdataset",
+                side_effect=RuntimeError("simulated generic failure"),
+            ):
+                builder.build()
+
+        assert len(builder.failed_list) == len(builder.esm_ds.keys())
+        assert set(fl[0] for fl in builder.failed_list) == set(builder.esm_ds.keys())
+
+    def test_build_concat_dim_fallback_failure(
+        self, local_om2_datastore_path, intake_esm_kwargs, tmpdir
+    ):
+        """When the concat-dim fallback's xr.open_dataset also fails, all groups land
+        in failed_list and the build raises IcechunkError."""
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = IcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            icechunk_store_path=dummy_store_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+        )
+        concat_dim_msg = (
+            "Could not find any dimension coordinates to use to order "
+            "the Dataset objects for concatenation"
+        )
+        with pytest.raises(
+            icechunk.IcechunkError,
+            match="cannot commit, no changes made to the session",
+        ):
+            with patch(
+                "xarray.open_mfdataset",
+                side_effect=ValueError(concat_dim_msg),
+            ):
+                with patch(
+                    "xarray.open_dataset",
+                    side_effect=RuntimeError("single file open also failed"),
+                ):
+                    builder.build()
+
+        assert len(builder.failed_list) == len(builder.esm_ds.keys())
+        assert set(fl[0] for fl in builder.failed_list) == set(builder.esm_ds.keys())
 
 
 class TestIcechunkCephStoreBuilder(BuilderTests):
