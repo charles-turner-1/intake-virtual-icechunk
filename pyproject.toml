@@ -73,7 +73,11 @@ omit = [
 
 [tool.pixi.workspace]
 name = "intake-virtual-icechunk"
-channels = ["conda-forge", "accessnri"]
+channels = [
+  "conda-forge",
+  { channel = "accessnri", exclude-newer = "0d" },
+]
+exclude-newer = "7d"
 platforms = ["osx-arm64", "linux-64"]
 
 [tool.pixi.dependencies]

@@ -1,3 +1,4 @@
+import asyncio
 import os
 
 from dotenv import load_dotenv
@@ -17,11 +18,31 @@ s3_store: ObjectStore = from_url(
     },
 )
 
-del_list = []
-for batch in s3_store.list():
-    for obj in batch:
-        if obj.get("path").startswith("icecat"):
-            del_list.append(obj.get("path"))
 
-for key in del_list:
-    s3_store.delete(key)
+async def clean_store(
+    s3_store: ObjectStore, prefix: str = "icecat", concurrency: int = 256
+) -> None:
+    sem = asyncio.Semaphore(concurrency)
+
+    async def delete_one(path: str) -> None:
+        """
+        Concurrent deletion of a single object, with a semaphore to limit concurrency.
+        """
+        async with sem:
+            await s3_store.delete_async(path)
+
+    tasks = []
+
+    async for batch in s3_store.list_async():
+        for obj in batch:
+            path = obj["path"]
+            if path.startswith(prefix):
+                tasks.append(asyncio.create_task(delete_one(path)))
+
+        # periodically drain so to avoid building up too many tasks in memory
+        if len(tasks) >= 1000:
+            await asyncio.gather(*tasks)
+            tasks.clear()
+
+    if tasks:
+        await asyncio.gather(*tasks)
