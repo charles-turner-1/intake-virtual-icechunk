@@ -93,6 +93,12 @@ class GroupEntry:
         )
 
     @property
+    def has_metadata_df(self) -> bool:
+        """Return whether this entry includes rich per-asset metadata rows."""
+
+        return self.metadata_df is not None
+
+    @property
     def group_df(self) -> pd.DataFrame:
         """Return the metadata dataframe required by catalog-shaped builder paths."""
 
