@@ -14,7 +14,7 @@ import tlz
 import virtualizarr
 from access_nri_intake.source.builders import AccessOm2Builder
 from dotenv import load_dotenv
-from intake_esm import esm_datastore
+from intake_esm.core import esm_datastore
 from obstore.store import ObjectStore, from_url
 from pandas.testing import assert_frame_equal
 
@@ -23,7 +23,7 @@ from intake_virtual_icechunk.source import (
     IcechunkStoreBuilder,
     VirtualIcechunkStoreBuilder,
 )
-from intake_virtual_icechunk.source._build import GroupEntry, GroupEntryError
+from intake_virtual_icechunk.source.utils import GroupEntry, GroupEntryError
 from intake_virtual_icechunk.utils import _intake_cat_filename
 
 __all__ = ["VirtualIcechunkStoreBuilder", "pytest"]
