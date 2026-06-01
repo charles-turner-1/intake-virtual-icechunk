@@ -129,14 +129,14 @@ class AbstractIcechunkStoreBuilder(abc.ABC):
         """Lazily open and cache the intake-esm datastore."""
 
         if self._esm_ds is None:
-            self._esm_ds = intake.open_esm_datastore(
+            self._esm_ds = intake.open_esm_datastore(  # type: ignore[assignment]
                 self.esm_datastore_path, **self.esm_datastore_kwargs
             )
-        return self._esm_ds
+        return self._esm_ds  # type: ignore[union-attr]
 
     @cached_property
     def xarray_kwargs(self) -> list[dict]:
-        """Return used defined xarray kwargs, promoted to a list the same length as the datastore
+        """Return user defined xarray kwargs, promoted to a list the same length as the datastore
 
         TODO: This should probably be a dict, not a list, because IDK if the datastore iteration is
         stable.

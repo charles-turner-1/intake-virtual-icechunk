@@ -748,6 +748,37 @@ class TestVirtualIcechunkStoreBuilder(BuilderTests):
         assert len(builder.failed_list) == len(builder.esm_ds.keys())
         assert set(fl[0] for fl in builder.failed_list) == set(builder.esm_ds.keys())
 
+    @pytest.mark.parametrize(
+        "xr_kwargs",
+        [None, {"decode_cf": True}, [{"decode_cf": True}, {"decode_times": True}]],
+    )
+    def test_init_xarray_kwargs(
+        self,
+        local_om2_datastore_path,
+        om2_datastore,
+        intake_esm_kwargs,
+        tmpdir,
+        xr_kwargs,
+    ):
+        """
+        Test that we can initialise and pass through the xarray kwargs corerctly.
+        This behaviour is defined on the ABC, so we only need to test it on one
+        of the child calssed
+        """
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = VirtualIcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            icechunk_store_path=dummy_store_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+            xarray_kwargs=xr_kwargs,
+        )
+        if xr_kwargs is None:
+            assert builder.xarray_kwargs == [{} for _ in builder.esm_ds]
+        elif isinstance(xr_kwargs, dict):
+            assert builder.xarray_kwargs == [xr_kwargs for _ in builder.esm_ds]
+        elif isinstance(xr_kwargs, list):
+            assert builder.xarray_kwargs == xr_kwargs
+
 
 class TestIcechunkStoreBuilderIsAbstract:
     """Verify that IcechunkStoreBuilder cannot be instantiated directly."""
