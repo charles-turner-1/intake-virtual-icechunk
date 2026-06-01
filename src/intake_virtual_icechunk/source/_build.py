@@ -493,6 +493,8 @@ class VirtualIcechunkStoreBuilder(AbstractIcechunkStoreBuilder):
     def _write_entry(self, store: icechunk.IcechunkStore, entry: GroupEntry) -> None:
         """Write one virtualized group into an open Icechunk transaction."""
 
+        # Are these defaults too opinionated?  Maybe we should have a narrower set
+        # of defaults or have a total override if the user provides any xarray kwargs?
         default_kwargs = dict(
             parser=self.parser,
             registry=self.obstore_registry,

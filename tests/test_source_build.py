@@ -762,7 +762,7 @@ class TestVirtualIcechunkStoreBuilder(BuilderTests):
         """
         Test that we can initialise and pass through the xarray kwargs corerctly.
         This behaviour is defined on the ABC, so we only need to test it on one
-        of the child calssed
+        of the child classes
         """
         dummy_store_path = tmpdir / "dummy_store.icechunk"
         builder = VirtualIcechunkStoreBuilder(
@@ -777,6 +777,33 @@ class TestVirtualIcechunkStoreBuilder(BuilderTests):
             assert builder.xarray_kwargs == [xr_kwargs for _ in builder.esm_ds]
         elif isinstance(xr_kwargs, list):
             assert builder.xarray_kwargs == xr_kwargs
+
+    @patch("intake_virtual_icechunk.source._build.open_virtual_mfdataset")
+    def test_build_nested(
+        self,
+        mock_open_virtual_mfdataset,
+        local_om2_datastore_path,
+        intake_esm_kwargs,
+        tmpdir,
+    ):
+        """
+        Test that we can initialise and pass through the xarray kwargs corerctly.
+        This behaviour is defined on the ABC, so we only need to test it on one
+        of the child calssed
+        """
+        dummy_store_path = tmpdir / "dummy_store.icechunk"
+        builder = VirtualIcechunkStoreBuilder(
+            esm_datastore_path=local_om2_datastore_path,
+            icechunk_store_path=dummy_store_path,
+            esm_datastore_kwargs=intake_esm_kwargs,
+            xarray_kwargs={"combine": "nested"},
+        )
+        builder.build()
+
+        assert mock_open_virtual_mfdataset.call_count == len(builder.esm_ds)
+        for call in mock_open_virtual_mfdataset.call_args_list:
+            _, kwargs = call
+            assert kwargs["combine"] == "nested"
 
 
 class TestIcechunkStoreBuilderIsAbstract:
